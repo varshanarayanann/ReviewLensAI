@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     database_url: SecretStr = Field(min_length=1)
     cors_origins: Annotated[list[str], NoDecode] = Field(min_length=1)
     supabase_url: str = Field(pattern=r"^https?://[^\s/]+")
+    supabase_publishable_key: str = Field(min_length=1)
 
     @field_validator("cors_origins", mode="before")
     @classmethod
@@ -28,6 +29,13 @@ class Settings(BaseSettings):
     @classmethod
     def strip_trailing_slash(cls, value: object) -> object:
         return value.strip().rstrip("/") if isinstance(value, str) else value
+
+    @field_validator("supabase_publishable_key")
+    @classmethod
+    def reject_secret_key(cls, value: str) -> str:
+        if value.strip().startswith("sb_secret_"):
+            raise ValueError("use the publishable key, not a secret key")
+        return value.strip()
 
     @property
     def supabase_auth_issuer(self) -> str:

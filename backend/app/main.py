@@ -21,7 +21,9 @@ def create_app(
     )
     app.state.settings = settings
     app.state.token_verifier = token_verifier or TokenVerifier.for_supabase(
-        settings.supabase_jwks_url, settings.supabase_auth_issuer
+        settings.supabase_jwks_url,
+        settings.supabase_auth_issuer,
+        settings.supabase_publishable_key,
     )
     app.add_middleware(
         CORSMiddleware,

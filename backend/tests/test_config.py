@@ -7,6 +7,7 @@ REQUIRED = {
     "database_url": "postgresql://localhost/db",
     "cors_origins": "http://localhost:5173",
     "supabase_url": "https://test-project.supabase.co",
+    "supabase_publishable_key": "sb_publishable_test_key",
 }
 
 
@@ -32,6 +33,7 @@ def test_settings_read_values_from_environment(
     monkeypatch.setenv("DATABASE_URL", "postgresql://env-host/db")
     monkeypatch.setenv("CORS_ORIGINS", "http://localhost:5173")
     monkeypatch.setenv("SUPABASE_URL", "https://env-project.supabase.co")
+    monkeypatch.setenv("SUPABASE_PUBLISHABLE_KEY", "sb_publishable_env_key")
 
     settings = load_settings(_env_file=None)
 
@@ -59,7 +61,12 @@ def test_missing_required_settings_fail_with_clear_message() -> None:
         load_settings(_env_file=None)
 
     message = str(exc_info.value)
-    for name in ("DATABASE_URL", "CORS_ORIGINS", "SUPABASE_URL"):
+    for name in (
+        "DATABASE_URL",
+        "CORS_ORIGINS",
+        "SUPABASE_URL",
+        "SUPABASE_PUBLISHABLE_KEY",
+    ):
         assert name in message
     assert "backend/.env.example" in message
 
@@ -73,6 +80,14 @@ def test_invalid_environment_name_is_rejected() -> None:
 def test_invalid_supabase_url_is_rejected(value: str) -> None:
     with pytest.raises(ConfigurationError, match="SUPABASE_URL"):
         settings_with(supabase_url=value)
+
+
+def test_supabase_secret_key_is_rejected_as_publishable_key() -> None:
+    with pytest.raises(ConfigurationError) as exc_info:
+        settings_with(supabase_publishable_key="sb_secret_do-not-use")
+
+    assert "SUPABASE_PUBLISHABLE_KEY" in str(exc_info.value)
+    assert "do-not-use" not in str(exc_info.value)
 
 
 def test_supabase_auth_urls_are_derived_from_project_url() -> None:

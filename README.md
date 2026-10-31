@@ -73,7 +73,8 @@ stores passwords. One team member sets up the shared Supabase project:
    with the project's public keys at `/auth/v1/.well-known/jwks.json`, so it needs
    no Supabase secret.
 4. Copy the values into your `.env` files:
-   - `backend/.env`: `SUPABASE_URL` = the Project URL.
+   - `backend/.env`: `SUPABASE_URL` = the Project URL and
+     `SUPABASE_PUBLISHABLE_KEY` = the publishable key.
    - `frontend/.env`: `VITE_SUPABASE_URL` = the Project URL and
      `VITE_SUPABASE_ANON_KEY` = the anon or publishable key.
      Never use the service-role or `sb_secret_` key.
@@ -182,6 +183,7 @@ The committed `.env.example` files list every required name. Never commit secret
 | `DATABASE_URL` | Yes | **Secret.** Postgres connection string from Supabase Dashboard > Connect (Session pooler) |
 | `CORS_ORIGINS` | Yes | Comma-separated frontend origins allowed to call the API, e.g. `http://localhost:5173` |
 | `SUPABASE_URL` | Yes | Supabase project URL, e.g. `https://<project-ref>.supabase.co`. Used to fetch the public keys that verify login tokens |
+| `SUPABASE_PUBLISHABLE_KEY` | Yes | Supabase publishable (or anon) key, the same public value as `VITE_SUPABASE_ANON_KEY`. Used to confirm with Supabase Auth that a login session is still active, so a token stops working as soon as its user logs out. The backend refuses an `sb_secret_` key here |
 | `REVIEW_PROVIDER_API_KEY` | From S1-020 | **Secret.** API key for the Google Maps review-data provider |
 | `REVIEW_MAX_PER_RUN` | From S1-020 | Maximum reviews collected in one ingestion run |
 

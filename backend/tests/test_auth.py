@@ -11,6 +11,7 @@ from tests.conftest import (
     ISSUER,
     USER_A_EMAIL,
     USER_A_ID,
+    FakeSessionChecker,
     StaticJWKClient,
     TokenFactory,
 )
@@ -130,7 +131,7 @@ def test_unreachable_signing_keys_return_503_without_details(
         def fetch_data(self) -> dict:
             raise jwt.PyJWKClientConnectionError("connection refused to jwks host")
 
-    verifier = TokenVerifier(UnreachableJWKClient({}), ISSUER)
+    verifier = TokenVerifier(UnreachableJWKClient({}), ISSUER, FakeSessionChecker())
     client = TestClient(create_app(settings, token_verifier=verifier))
 
     response = client.get("/api/me", headers=auth_header(make_token()))
@@ -140,6 +141,46 @@ def test_unreachable_signing_keys_return_503_without_details(
         "detail": "Authentication service is unavailable. Try again shortly."
     }
     assert "jwks" not in response.text
+
+
+def test_token_from_a_logged_out_session_is_rejected(
+    client: TestClient,
+    make_token: TokenFactory,
+    session_checker: FakeSessionChecker,
+) -> None:
+    token = make_token()
+    assert client.get("/api/me", headers=auth_header(token)).status_code == 200
+
+    session_checker.revoked_tokens.add(token)
+
+    assert_unauthenticated(client.get("/api/me", headers=auth_header(token)))
+
+
+def test_session_check_outage_returns_503_without_details(
+    client: TestClient,
+    make_token: TokenFactory,
+    session_checker: FakeSessionChecker,
+) -> None:
+    session_checker.unavailable = True
+
+    response = client.get("/api/me", headers=auth_header(make_token()))
+
+    assert response.status_code == 503
+    assert "timed out" not in response.text
+    assert USER_A_EMAIL not in response.text
+
+
+def test_invalid_tokens_are_rejected_before_contacting_supabase(
+    client: TestClient,
+    make_token: TokenFactory,
+    session_checker: FakeSessionChecker,
+) -> None:
+    expired = make_token(exp=int(time.time()) - 60)
+
+    client.get("/api/me", headers=auth_header(expired))
+    client.get("/api/me", headers=auth_header("not-a-jwt"))
+
+    assert session_checker.checked_tokens == []
 
 
 def test_health_endpoint_stays_public(client: TestClient) -> None:

@@ -7,7 +7,11 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric import ec
 from fastapi.testclient import TestClient
 
-from app.auth.tokens import TokenVerifier
+from app.auth.tokens import (
+    AuthServiceUnavailableError,
+    InvalidTokenError,
+    TokenVerifier,
+)
 from app.config import Settings, load_settings
 from app.main import create_app
 
@@ -18,6 +22,20 @@ USER_A_ID = "11111111-1111-4111-8111-111111111111"
 USER_A_EMAIL = "user.a@example.com"
 
 TokenFactory = Callable[..., str]
+
+
+class FakeSessionChecker:
+    def __init__(self) -> None:
+        self.revoked_tokens: set[str] = set()
+        self.unavailable = False
+        self.checked_tokens: list[str] = []
+
+    def ensure_active(self, token: str) -> None:
+        self.checked_tokens.append(token)
+        if self.unavailable:
+            raise AuthServiceUnavailableError("supabase auth timed out")
+        if token in self.revoked_tokens:
+            raise InvalidTokenError("session_not_found")
 
 
 class StaticJWKClient(jwt.PyJWKClient):
@@ -37,7 +55,13 @@ def public_jwks(private_key: ec.EllipticCurvePrivateKey, kid: str = KEY_ID) -> d
 
 @pytest.fixture(autouse=True)
 def isolated_environment(monkeypatch: pytest.MonkeyPatch) -> None:
-    for name in ("ENVIRONMENT", "DATABASE_URL", "CORS_ORIGINS", "SUPABASE_URL"):
+    for name in (
+        "ENVIRONMENT",
+        "DATABASE_URL",
+        "CORS_ORIGINS",
+        "SUPABASE_URL",
+        "SUPABASE_PUBLISHABLE_KEY",
+    ):
         monkeypatch.delenv(name, raising=False)
 
 
@@ -83,12 +107,22 @@ def settings() -> Settings:
         database_url="postgresql://user:pass@localhost:5432/reviewlens_test",
         cors_origins="http://localhost:5173",
         supabase_url=SUPABASE_URL,
+        supabase_publishable_key="sb_publishable_test_key",
     )
 
 
 @pytest.fixture
-def token_verifier(signing_key: ec.EllipticCurvePrivateKey) -> TokenVerifier:
-    return TokenVerifier(StaticJWKClient(public_jwks(signing_key)), ISSUER)
+def session_checker() -> FakeSessionChecker:
+    return FakeSessionChecker()
+
+
+@pytest.fixture
+def token_verifier(
+    signing_key: ec.EllipticCurvePrivateKey, session_checker: FakeSessionChecker
+) -> TokenVerifier:
+    return TokenVerifier(
+        StaticJWKClient(public_jwks(signing_key)), ISSUER, session_checker
+    )
 
 
 @pytest.fixture

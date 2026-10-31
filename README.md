@@ -14,7 +14,7 @@ questions grounded only in those reviews.
 | `backend/app/db.py` | Database connection (PostgreSQL on Supabase) and request-scoped sessions. |
 | `backend/migrations/` | Version-controlled SQL migrations for the database schema. |
 | `docs/` | Team context documents (UI/UX standards, design notes). |
-| `.github/workflows/` | GitHub Actions workflows. |
+| `.github/workflows/` | GitHub Actions: `ci.yml` (pull request checks), `import-sprint-issues.yml`. |
 
 | Concern | Technology |
 | --- | --- |
@@ -107,6 +107,36 @@ npm run lint
 npm test
 npm run build
 ```
+
+## Continuous integration
+
+`.github/workflows/ci.yml` runs automatically on every pull request, on every push
+to `main`, and on demand from the Actions tab. It reports two checks on the pull
+request; each runs lint, build, and unit tests for one part of the repo:
+
+| Check | Lint | Build | Unit tests |
+| --- | --- | --- | --- |
+| `Frontend` | `npm run lint` (oxlint) | `npm run build` (TypeScript type check + Vite build) | `npm test` (Vitest) |
+| `Backend` | `ruff check` + `ruff format --check` | `compileall` + import of `app.main` | `pytest` |
+
+Any failing step fails its check. Open the failed check on the pull request to
+see which step failed; Ruff problems are also annotated on the changed lines.
+
+### Merge protection
+
+`main` must be protected so pull requests cannot be merged while a check fails.
+A repository admin sets this in **Settings > Branches > Add branch protection rule**
+(or **Settings > Rules > Rulesets**) for `main`:
+
+- Require a pull request before merging.
+- Require status checks to pass before merging: `Frontend`, `Backend`.
+- Require branches to be up to date before merging.
+- Do not allow bypassing the above settings.
+
+A check name only appears in that list after the workflow has run once, so open
+a pull request first. When new code areas are added (for example the repo tooling
+in `scripts/` and `tests/` from S1-006), add their lint, build, and test steps to
+`ci.yml` in the same pull request and mark any new job as required.
 
 ## Environment variables
 

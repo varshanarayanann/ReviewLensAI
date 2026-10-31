@@ -55,7 +55,28 @@ npm install
 Copy-Item .env.example .env            # macOS/Linux: cp .env.example .env
 ```
 
-Edit `frontend/.env` if your backend does not run on `http://localhost:8000`.
+Edit `frontend/.env` and fill in the Supabase values. Change `VITE_API_BASE_URL`
+if your backend does not run on `http://localhost:8000`.
+
+### 3. Supabase Auth
+
+Accounts, passwords, and sessions are managed by Supabase Auth; ReviewLens never
+stores passwords. One team member sets up the shared Supabase project:
+
+1. **Authentication > Sign In / Providers > Email**: enable the Email provider.
+   Keep **Confirm email** on (recommended) so new accounts must confirm their address.
+2. **Authentication > URL Configuration**: set **Site URL** to
+   `http://localhost:5173` for local development and add the deployed Netlify URL
+   (for example `https://<site>.netlify.app/login`) to **Redirect URLs**.
+3. **Project Settings > API Keys**: make sure the project uses the new
+   asymmetric **JWT signing keys** (ECC or RSA). The backend verifies login tokens
+   with the project's public keys at `/auth/v1/.well-known/jwks.json`, so it needs
+   no Supabase secret.
+4. Copy the values into your `.env` files:
+   - `backend/.env`: `SUPABASE_URL` = the Project URL.
+   - `frontend/.env`: `VITE_SUPABASE_URL` = the Project URL and
+     `VITE_SUPABASE_ANON_KEY` = the anon or publishable key.
+     Never use the service-role or `sb_secret_` key.
 
 ## Running locally
 
@@ -76,12 +97,16 @@ cd frontend
 npm run dev
 ```
 
-Open http://localhost:5173. The page shows **Backend connected** when the
-frontend can reach the backend.
+Open http://localhost:5173. Logged-out visitors land on **Log in**; use
+**Register** to create an account. After logging in, the dashboard shows
+**Logged in as &lt;your email&gt;**, which the backend confirms by verifying your
+login token. **Log out** is in the header.
 
 Quick checks:
 
 - `GET http://localhost:8000/api/health` returns `{"status":"ok"}`.
+- `GET http://localhost:8000/api/me` returns `401` without a login token, and
+  `{"id": "...", "email": "..."}` with `Authorization: Bearer <access token>`.
 - `GET http://localhost:8000/api/health/db` returns `{"database":"ok"}` when
   `DATABASE_URL` is correct, or `503 {"database":"unavailable"}` when it is not.
 
@@ -156,7 +181,7 @@ The committed `.env.example` files list every required name. Never commit secret
 | `ENVIRONMENT` | No (default `local`) | `local`, `test`, or `production` |
 | `DATABASE_URL` | Yes | **Secret.** Postgres connection string from Supabase Dashboard > Connect (Session pooler) |
 | `CORS_ORIGINS` | Yes | Comma-separated frontend origins allowed to call the API, e.g. `http://localhost:5173` |
-| `SUPABASE_URL` | From S1-009 | Supabase project URL, used to verify login tokens |
+| `SUPABASE_URL` | Yes | Supabase project URL, e.g. `https://<project-ref>.supabase.co`. Used to fetch the public keys that verify login tokens |
 | `REVIEW_PROVIDER_API_KEY` | From S1-020 | **Secret.** API key for the Google Maps review-data provider |
 | `REVIEW_MAX_PER_RUN` | From S1-020 | Maximum reviews collected in one ingestion run |
 
@@ -168,8 +193,8 @@ The backend refuses to start and names the missing variables if a required value
 | Name | Required | Description |
 | --- | --- | --- |
 | `VITE_API_BASE_URL` | Yes | Backend base URL, e.g. `http://localhost:8000` |
-| `VITE_SUPABASE_URL` | From S1-009 | Supabase project URL |
-| `VITE_SUPABASE_ANON_KEY` | From S1-009 | Supabase anon (public) key |
+| `VITE_SUPABASE_URL` | Yes | Supabase project URL |
+| `VITE_SUPABASE_ANON_KEY` | Yes | Supabase anon or publishable (public) key. The app refuses to start if a service-role or `sb_secret_` key is put here |
 
 Every `VITE_*` value is visible in the browser. Only public values belong here;
 the Supabase service-role key and database password must never appear in the frontend.

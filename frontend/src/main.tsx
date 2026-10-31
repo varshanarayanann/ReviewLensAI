@@ -1,17 +1,22 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { BrowserRouter } from 'react-router'
 import './styles/tokens.css'
 import './index.css'
 import App from './App.tsx'
 import { ConfigError, loadConfig } from './lib/config'
+import { createSupabaseClient } from './lib/supabase'
 
 const root = createRoot(document.getElementById('root')!)
 
 try {
   const config = loadConfig()
+  const supabase = createSupabaseClient(config)
   root.render(
     <StrictMode>
-      <App config={config} />
+      <BrowserRouter>
+        <App config={config} authClient={supabase.auth} />
+      </BrowserRouter>
     </StrictMode>,
   )
 } catch (error) {

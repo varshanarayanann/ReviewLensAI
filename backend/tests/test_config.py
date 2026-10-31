@@ -3,12 +3,20 @@ import pytest
 from app.config import ConfigurationError, load_settings
 from app.db import to_sqlalchemy_url
 
+REQUIRED = {
+    "database_url": "postgresql://localhost/db",
+    "cors_origins": "http://localhost:5173",
+    "supabase_url": "https://test-project.supabase.co",
+}
+
+
+def settings_with(**overrides: object):
+    return load_settings(_env_file=None, **{**REQUIRED, **overrides})
+
 
 def test_settings_parse_comma_separated_cors_origins() -> None:
-    settings = load_settings(
-        _env_file=None,
-        database_url="postgresql://localhost/db",
-        cors_origins="http://localhost:5173, https://reviewlens.netlify.app",
+    settings = settings_with(
+        cors_origins="http://localhost:5173, https://reviewlens.netlify.app"
     )
 
     assert settings.cors_origins == [
@@ -23,17 +31,17 @@ def test_settings_read_values_from_environment(
 ) -> None:
     monkeypatch.setenv("DATABASE_URL", "postgresql://env-host/db")
     monkeypatch.setenv("CORS_ORIGINS", "http://localhost:5173")
+    monkeypatch.setenv("SUPABASE_URL", "https://env-project.supabase.co")
 
     settings = load_settings(_env_file=None)
 
     assert settings.database_url.get_secret_value() == "postgresql://env-host/db"
+    assert settings.supabase_url == "https://env-project.supabase.co"
 
 
 def test_database_url_is_hidden_when_settings_are_printed() -> None:
-    settings = load_settings(
-        _env_file=None,
-        database_url="postgresql://app:sup3r-s3cret@db.example.com:5432/postgres",
-        cors_origins="http://localhost:5173",
+    settings = settings_with(
+        database_url="postgresql://app:sup3r-s3cret@db.example.com:5432/postgres"
     )
 
     for rendered in (str(settings), repr(settings), str(settings.model_dump())):
@@ -43,9 +51,7 @@ def test_database_url_is_hidden_when_settings_are_printed() -> None:
 
 def test_empty_database_url_is_rejected() -> None:
     with pytest.raises(ConfigurationError, match="DATABASE_URL"):
-        load_settings(
-            _env_file=None, database_url="", cors_origins="http://localhost:5173"
-        )
+        settings_with(database_url="")
 
 
 def test_missing_required_settings_fail_with_clear_message() -> None:
@@ -53,19 +59,30 @@ def test_missing_required_settings_fail_with_clear_message() -> None:
         load_settings(_env_file=None)
 
     message = str(exc_info.value)
-    assert "DATABASE_URL" in message
-    assert "CORS_ORIGINS" in message
+    for name in ("DATABASE_URL", "CORS_ORIGINS", "SUPABASE_URL"):
+        assert name in message
     assert "backend/.env.example" in message
 
 
 def test_invalid_environment_name_is_rejected() -> None:
     with pytest.raises(ConfigurationError, match="ENVIRONMENT"):
-        load_settings(
-            _env_file=None,
-            environment="staging",
-            database_url="postgresql://localhost/db",
-            cors_origins="http://localhost:5173",
-        )
+        settings_with(environment="staging")
+
+
+@pytest.mark.parametrize("value", ["", "test-project.supabase.co", "ftp://x.co"])
+def test_invalid_supabase_url_is_rejected(value: str) -> None:
+    with pytest.raises(ConfigurationError, match="SUPABASE_URL"):
+        settings_with(supabase_url=value)
+
+
+def test_supabase_auth_urls_are_derived_from_project_url() -> None:
+    settings = settings_with(supabase_url="https://abc.supabase.co/")
+
+    assert settings.supabase_auth_issuer == "https://abc.supabase.co/auth/v1"
+    assert (
+        settings.supabase_jwks_url
+        == "https://abc.supabase.co/auth/v1/.well-known/jwks.json"
+    )
 
 
 @pytest.mark.parametrize(

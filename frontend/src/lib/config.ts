@@ -1,5 +1,7 @@
 export interface AppConfig {
   apiBaseUrl: string
+  supabaseUrl: string
+  supabaseAnonKey: string
 }
 
 export class ConfigError extends Error {}
@@ -39,14 +41,22 @@ function assertNoSecretKeys(env: Env): void {
   }
 }
 
+function required(env: Env, name: string): string {
+  const value = env[name]?.trim()
+  if (!value) {
+    throw new ConfigError(
+      `${name} is not set. Copy frontend/.env.example to frontend/.env and fill in the values.`,
+    )
+  }
+  return value
+}
+
 export function loadConfig(env: Env = import.meta.env): AppConfig {
   assertNoSecretKeys(env)
 
-  const apiBaseUrl = env.VITE_API_BASE_URL?.trim()
-  if (!apiBaseUrl) {
-    throw new ConfigError(
-      'VITE_API_BASE_URL is not set. Copy frontend/.env.example to frontend/.env and fill in the values.',
-    )
+  return {
+    apiBaseUrl: required(env, 'VITE_API_BASE_URL').replace(/\/+$/, ''),
+    supabaseUrl: required(env, 'VITE_SUPABASE_URL').replace(/\/+$/, ''),
+    supabaseAnonKey: required(env, 'VITE_SUPABASE_ANON_KEY'),
   }
-  return { apiBaseUrl: apiBaseUrl.replace(/\/+$/, '') }
 }

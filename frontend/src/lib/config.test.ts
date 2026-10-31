@@ -7,28 +7,37 @@ function fakeJwt(payload: Record<string, unknown>): string {
   return `${encode({ alg: 'HS256', typ: 'JWT' })}.${encode(payload)}.test-signature`
 }
 
-const base = { VITE_API_BASE_URL: 'http://localhost:8000' }
+const base = {
+  VITE_API_BASE_URL: 'http://localhost:8000',
+  VITE_SUPABASE_URL: 'https://test-project.supabase.co',
+  VITE_SUPABASE_ANON_KEY: 'sb_publishable_test_key',
+}
 
 describe('loadConfig', () => {
-  it('reads the API base URL and strips trailing slashes', () => {
-    expect(loadConfig({ VITE_API_BASE_URL: 'http://localhost:8000/' })).toEqual({
+  it('reads all values and strips trailing slashes from URLs', () => {
+    const env = {
+      ...base,
+      VITE_API_BASE_URL: 'http://localhost:8000/',
+      VITE_SUPABASE_URL: 'https://test-project.supabase.co/',
+    }
+
+    expect(loadConfig(env)).toEqual({
       apiBaseUrl: 'http://localhost:8000',
+      supabaseUrl: 'https://test-project.supabase.co',
+      supabaseAnonKey: 'sb_publishable_test_key',
     })
   })
 
-  it('fails with a clear message when the API base URL is missing', () => {
-    expect(() => loadConfig({})).toThrow(ConfigError)
-    expect(() => loadConfig({ VITE_API_BASE_URL: '  ' })).toThrow(/VITE_API_BASE_URL is not set/)
-  })
+  it.each(['VITE_API_BASE_URL', 'VITE_SUPABASE_URL', 'VITE_SUPABASE_ANON_KEY'])(
+    'fails with a clear message when %s is missing',
+    (name) => {
+      expect(() => loadConfig({ ...base, [name]: undefined })).toThrow(ConfigError)
+      expect(() => loadConfig({ ...base, [name]: '  ' })).toThrow(`${name} is not set`)
+    },
+  )
 
   it('accepts a Supabase anon key', () => {
     const env = { ...base, VITE_SUPABASE_ANON_KEY: fakeJwt({ role: 'anon' }) }
-
-    expect(loadConfig(env).apiBaseUrl).toBe('http://localhost:8000')
-  })
-
-  it('accepts a Supabase publishable key', () => {
-    const env = { ...base, VITE_SUPABASE_ANON_KEY: 'sb_publishable_test_key' }
 
     expect(loadConfig(env).apiBaseUrl).toBe('http://localhost:8000')
   })

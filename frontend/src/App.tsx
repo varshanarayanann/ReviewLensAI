@@ -1,35 +1,32 @@
-import { useEffect, useState } from 'react'
-import { getHealth } from './lib/api/client'
+import { Route, Routes } from 'react-router'
+import { ProtectedRoute, PublicOnlyRoute, RootRedirect } from './components/layout/RouteGuards'
+import type { AuthClient } from './lib/auth/AuthContext'
+import { AuthProvider } from './lib/auth/AuthProvider'
 import type { AppConfig } from './lib/config'
+import DashboardPage from './pages/DashboardPage'
+import LoginPage from './pages/LoginPage'
+import NotFoundPage from './pages/NotFoundPage'
+import RegisterPage from './pages/RegisterPage'
 
-type BackendStatus = 'checking' | 'connected' | 'unreachable'
-
-const STATUS_TEXT: Record<BackendStatus, string> = {
-  checking: 'Checking backend connection...',
-  connected: 'Backend connected',
-  unreachable: "Can't reach the backend. Check that it is running and that VITE_API_BASE_URL is correct.",
+interface AppProps {
+  config: AppConfig
+  authClient: AuthClient
 }
 
-export default function App({ config }: { config: AppConfig }) {
-  const [status, setStatus] = useState<BackendStatus>('checking')
-
-  useEffect(() => {
-    let cancelled = false
-    getHealth(config.apiBaseUrl)
-      .then(() => !cancelled && setStatus('connected'))
-      .catch(() => !cancelled && setStatus('unreachable'))
-    return () => {
-      cancelled = true
-    }
-  }, [config.apiBaseUrl])
-
+export default function App({ config, authClient }: AppProps) {
   return (
-    <main className="app">
-      <h1>ReviewLens AI</h1>
-      <p className="muted">Review Intelligence Portal</p>
-      <p role="status" className={`status status--${status}`}>
-        {STATUS_TEXT[status]}
-      </p>
-    </main>
+    <AuthProvider client={authClient}>
+      <Routes>
+        <Route path="/" element={<RootRedirect />} />
+        <Route element={<PublicOnlyRoute />}>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+        </Route>
+        <Route element={<ProtectedRoute />}>
+          <Route path="/dashboard" element={<DashboardPage apiBaseUrl={config.apiBaseUrl} />} />
+        </Route>
+        <Route path="*" element={<NotFoundPage />} />
+      </Routes>
+    </AuthProvider>
   )
 }

@@ -17,7 +17,7 @@ def to_sqlalchemy_url(database_url: str) -> str:
 @lru_cache
 def get_engine() -> Engine:
     return create_engine(
-        to_sqlalchemy_url(get_settings().database_url),
+        to_sqlalchemy_url(get_settings().database_url.get_secret_value()),
         pool_pre_ping=True,
         connect_args={"connect_timeout": 5},
     )

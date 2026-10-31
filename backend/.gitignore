@@ -1,9 +1,0 @@
-.venv/
-__pycache__/
-.pytest_cache/
-.ruff_cache/
-
-# Environment files (copy .env.example to .env)
-.env
-.env.*
-!.env.example

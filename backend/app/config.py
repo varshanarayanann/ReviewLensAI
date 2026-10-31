@@ -1,7 +1,7 @@
 from functools import lru_cache
 from typing import Annotated, Literal
 
-from pydantic import Field, ValidationError, field_validator
+from pydantic import Field, SecretStr, ValidationError, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     environment: Literal["local", "test", "production"] = "local"
-    database_url: str = Field(min_length=1)
+    database_url: SecretStr = Field(min_length=1)
     cors_origins: Annotated[list[str], NoDecode] = Field(min_length=1)
 
     @field_validator("cors_origins", mode="before")

@@ -26,7 +26,26 @@ def test_settings_read_values_from_environment(
 
     settings = load_settings(_env_file=None)
 
-    assert settings.database_url == "postgresql://env-host/db"
+    assert settings.database_url.get_secret_value() == "postgresql://env-host/db"
+
+
+def test_database_url_is_hidden_when_settings_are_printed() -> None:
+    settings = load_settings(
+        _env_file=None,
+        database_url="postgresql://app:sup3r-s3cret@db.example.com:5432/postgres",
+        cors_origins="http://localhost:5173",
+    )
+
+    for rendered in (str(settings), repr(settings), str(settings.model_dump())):
+        assert "sup3r-s3cret" not in rendered
+    assert "sup3r-s3cret" in settings.database_url.get_secret_value()
+
+
+def test_empty_database_url_is_rejected() -> None:
+    with pytest.raises(ConfigurationError, match="DATABASE_URL"):
+        load_settings(
+            _env_file=None, database_url="", cors_origins="http://localhost:5173"
+        )
 
 
 def test_missing_required_settings_fail_with_clear_message() -> None:

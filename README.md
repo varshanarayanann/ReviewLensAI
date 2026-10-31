@@ -111,13 +111,19 @@ npm run build
 ## Continuous integration
 
 `.github/workflows/ci.yml` runs automatically on every pull request, on every push
-to `main`, and on demand from the Actions tab. It reports two checks on the pull
-request; each runs lint, build, and unit tests for one part of the repo:
+to `main`, and on demand from the Actions tab. `Frontend` and `Backend` each run
+lint, build, and unit tests for one part of the repo:
 
 | Check | Lint | Build | Unit tests |
 | --- | --- | --- | --- |
 | `Frontend` | `npm run lint` (oxlint) | `npm run build` (TypeScript type check + Vite build) | `npm test` (Vitest) |
 | `Backend` | `ruff check` + `ruff format --check` | `compileall` + import of `app.main` | `pytest` |
+
+`Secrets` fails if any `.env` file (other than `.env.example`) is committed, and
+scans the full git history with [gitleaks](https://github.com/gitleaks/gitleaks)
+for leaked keys, tokens, and passwords. If it fails, remove the secret **and
+rotate it** in the provider's dashboard; deleting it from a later commit does not
+remove it from history.
 
 Any failing step fails its check. Open the failed check on the pull request to
 see which step failed; Ruff problems are also annotated on the changed lines.
@@ -129,7 +135,7 @@ A repository admin sets this in **Settings > Branches > Add branch protection ru
 (or **Settings > Rules > Rulesets**) for `main`:
 
 - Require a pull request before merging.
-- Require status checks to pass before merging: `Frontend`, `Backend`.
+- Require status checks to pass before merging: `Frontend`, `Backend`, `Secrets`.
 - Require branches to be up to date before merging.
 - Do not allow bypassing the above settings.
 
@@ -148,10 +154,14 @@ The committed `.env.example` files list every required name. Never commit secret
 | Name | Required | Description |
 | --- | --- | --- |
 | `ENVIRONMENT` | No (default `local`) | `local`, `test`, or `production` |
-| `DATABASE_URL` | Yes | Postgres connection string from Supabase Dashboard > Connect (Session pooler) |
+| `DATABASE_URL` | Yes | **Secret.** Postgres connection string from Supabase Dashboard > Connect (Session pooler) |
 | `CORS_ORIGINS` | Yes | Comma-separated frontend origins allowed to call the API, e.g. `http://localhost:5173` |
+| `SUPABASE_URL` | From S1-009 | Supabase project URL, used to verify login tokens |
+| `REVIEW_PROVIDER_API_KEY` | From S1-020 | **Secret.** API key for the Google Maps review-data provider |
+| `REVIEW_MAX_PER_RUN` | From S1-020 | Maximum reviews collected in one ingestion run |
 
 The backend refuses to start and names the missing variables if a required value is absent.
+`DATABASE_URL` is stored as a secret value, so it prints as `**********` in logs and errors.
 
 ### Frontend (`frontend/.env`) - bundled into browser code
 

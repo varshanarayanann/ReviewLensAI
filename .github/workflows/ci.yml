@@ -77,3 +77,34 @@ jobs:
 
       - name: Unit tests
         run: python -m pytest -ra
+
+  secrets:
+    name: Secrets
+    runs-on: ubuntu-latest
+    env:
+      GITLEAKS_VERSION: 8.30.1
+    steps:
+      - name: Check out repository (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: No committed environment files
+        run: |
+          files=$(git ls-files | grep -E '(^|/)\.env(\..+)?$' | grep -vE '(^|/)\.env\.example$' || true)
+          if [ -n "$files" ]; then
+            echo "::error::Environment files must not be committed. Remove them and rotate any secrets they contain:"
+            echo "$files"
+            exit 1
+          fi
+
+      - name: Install gitleaks
+        run: |
+          base="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
+          archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -sSfLO "${base}/${archive}"
+          curl -sSfL "${base}/gitleaks_${GITLEAKS_VERSION}_checksums.txt" | grep " ${archive}\$" | sha256sum -c -
+          tar -xzf "${archive}" gitleaks
+
+      - name: Scan git history for leaked secrets
+        run: ./gitleaks git --redact --verbose --exit-code 1 .

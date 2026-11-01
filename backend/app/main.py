@@ -3,7 +3,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import health, me
+from app.api import health, me, targets
 from app.auth.tokens import TokenVerifier
 from app.config import Settings, get_settings
 
@@ -34,4 +34,5 @@ def create_app(
     )
     app.include_router(health.router)
     app.include_router(me.router)
+    app.include_router(targets.router)
     return app

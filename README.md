@@ -201,6 +201,20 @@ The backend refuses to start and names the missing variables if a required value
 Every `VITE_*` value is visible in the browser. Only public values belong here;
 the Supabase service-role key and database password must never appear in the frontend.
 
+## Ingestion source submission (S1-019)
+
+The existing CSV import path submits JSON `csv_text` to
+`POST /api/targets/{target_id}/ingestions` with the current bearer token. The
+backend verifies target ownership before parsing, then checks required CSV
+structure and limits before creating an attempt. Rejected sources return 422
+without altering reviews or the previous latest result. Missing/cross-user
+targets share the same 404 response and start no processing.
+
+See [the CSV source contract](docs/csv-import-format.md) for exact columns, limits,
+and outcome semantics, and [the S1-019 handoff](docs/handoffs/s1-019-ingestion.md)
+for the original issue author's branch/PR instructions. Primary URL/provider
+collection remains separate work; no provider credentials are needed for CSV.
+
 ## Database migrations
 
 Schema changes are SQL files in `backend/migrations/`, applied in filename order.

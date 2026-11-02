@@ -212,6 +212,19 @@ The UI vocabulary is no run → **Not ingested**, `processing` → **Ingesting**
 
 CSV column names (`rating`, `review_text`), file size limits, review caps, provider choice, and sync/async execution details are not finalized implemented contracts. Keep them explicit when implementing #20/#21/#23 instead of silently treating UI examples as a completed API specification.
 
+## S1-020 source-adapter update (2026-11-02, branch work)
+
+The selected implementation for S1-020 is supplied-export CSV import. A pure
+`app.reviews.csv_source.parse_csv_reviews` function separates record extraction
+from HTTP/UI/persistence and preserves raw text, rating, and optional metadata.
+The route authorizes the parent before calling it; structural source failures
+return safe 422 without recording an attempt. Normalization and existing database
+transactions remain separate. Test fixtures are explicitly synthetic and never
+loaded by application code. See [the approach](docs/review-ingestion-approach.md)
+and [CSV contract](docs/csv-import-format.md), including S1-019/S1-021 integration
+notes. URL-provider collection remains unimplemented; provider environment values
+are reserved placeholders, not required settings for this import path.
+
 ## 7. Local setup and configuration
 
 Run backend commands **inside `backend/`**: Pydantic reads `.env` relative to the working directory. Frontend commands run inside `frontend/`. Use separate terminals.

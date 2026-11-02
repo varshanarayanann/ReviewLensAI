@@ -4,6 +4,7 @@ import { AppShell } from '../components/layout/AppShell'
 import { Alert } from '../components/ui/Alert'
 import { ApiError, targetRequest } from '../lib/api/client'
 import { useAuth } from '../lib/auth/AuthContext'
+import { MESSAGES } from '../lib/messages'
 
 type Result = { state: 'processing' | 'succeeded' | 'failed'; persisted_count: number; message: string }
 
@@ -54,7 +55,7 @@ export default function TargetWorkflowPage({ apiBaseUrl }: { apiBaseUrl: string 
         await expireSession()
       } else {
         setError(failure instanceof ApiError && failure.status === 422
-          ? 'Check the target name (1–120 characters) and enter a valid HTTPS Google Maps business URL.'
+          ? targetId ? MESSAGES.csvSourceInvalid : 'Check the target name (1–120 characters) and enter a valid HTTPS Google Maps business URL.'
           : 'The operation could not be completed. Check your access and try again.')
       }
     } finally { setBusy(false) }

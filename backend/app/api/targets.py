@@ -1,10 +1,8 @@
-import csv
-import io
 import logging
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -13,6 +11,7 @@ from app.auth.tokens import CurrentUser
 from app.db import get_db
 from app.models import AnalysisTarget
 from app.models.ingestion import IngestionRun, Review
+from app.reviews.csv_source import ReviewSourceError, parse_csv_reviews
 from app.schemas.analysis_target import AnalysisTargetCreate
 from app.schemas.ingestion_result import IngestionResult
 
@@ -45,6 +44,8 @@ def create_target(
 
 
 class CsvImport(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     csv_text: str = Field(min_length=1, max_length=1_000_000)
 
 
@@ -56,22 +57,25 @@ def ingest(
     db: Session = Depends(get_db),
 ):
     owned(target_id, user, db)
+    try:
+        records = parse_csv_reviews(body.csv_text)
+    except ReviewSourceError:
+        raise HTTPException(
+            422,
+            "Provide a CSV with rating and review_text columns and 1–1,000 "
+            "reviews (maximum 1 MB).",
+        ) from None
     run = IngestionRun(target_id=target_id)
     db.add(run)
     db.commit()
     db.refresh(run)
     run_id = run.id
     try:
-        reader = csv.DictReader(
-            io.StringIO(body.csv_text.lstrip("\ufeff")), strict=True
-        )
-        if not {"rating", "review_text"}.issubset(reader.fieldnames or []):
-            raise ValueError("columns")
         rows = []
-        for row in reader:
+        for row in records:
             rating = int(row.get("rating") or "")
             text = (row.get("review_text") or "").strip()
-            if not text or rating not in range(1, 6) or len(rows) >= 1000:
+            if not text or rating not in range(1, 6):
                 raise ValueError("invalid record or limit")
             rows.append(
                 Review(

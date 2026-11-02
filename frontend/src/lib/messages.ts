@@ -13,4 +13,5 @@ export const MESSAGES = {
   sessionEnded: 'Your session has ended. Please log in again.',
   offline: 'You appear to be offline. Check your connection and try again.',
   unexpected: 'Something went wrong on our side. Try again, and contact the team if it keeps happening.',
+  csvSourceInvalid: 'Choose a CSV with rating and review_text columns, 1–1,000 reviews, and a file size of 1 MB or less.',
 } as const

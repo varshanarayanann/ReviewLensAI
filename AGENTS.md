@@ -450,3 +450,17 @@ the tests create/drop isolated databases. Backend CI supplies PostgreSQL 18.
 Hosted Supabase auth remains mocked; do not describe this as live Supabase testing.
 S1-023 acceptance is satisfied by CSV ingestion results; primary URL-provider
 integration remains S1-020 work, not an absolute prerequisite for S1-023 closure.
+
+### S1-013 authorization update (2026-11-02, branch work)
+
+`GET /api/targets/{target_id}/reviews` authorizes the parent with the existing
+`owned` helper before querying target-scoped reviews. It returns a JSON array of
+`id`, `target_id`, `run_id`, `review_text`, and `rating`, ordered by review UUID;
+`limit` defaults to 50 (1–100), and `offset` defaults to 0 (nonnegative).
+See [README — Review and ingestion authorization](README.md#review-and-ingestion-authorization-s1-013)
+for the child-operation contract. Direct review mutation APIs are not exposed;
+CSV ingestion remains the only implemented write path. Two-user tests in
+`backend/tests/test_target_workflow.py` cover data isolation and denied operations
+leaving all stored rows unchanged on SQLite and PostgreSQL. This supersedes the
+older snapshot's statement that review listing is unimplemented when this branch
+is present; it does not imply a merged release or frontend review-list UI.

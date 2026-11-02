@@ -117,6 +117,31 @@ Quick checks:
 If port 8000 is already in use, start the backend with another port (for example
 `--port 8001`) and set `VITE_API_BASE_URL=http://localhost:8001` in `frontend/.env`.
 
+## Review and ingestion authorization (S1-013)
+
+Review ownership is inherited through `AnalysisTarget.owner_id`. Every implemented
+child operation authenticates the caller and checks the parent target by both ID
+and verified owner before accessing review data or starting ingestion:
+
+| Operation | Contract |
+| --- | --- |
+| `GET /api/targets/{target_id}/reviews` | Returns only that owned target's persisted reviews as a JSON array. Each record contains `id`, `target_id`, `run_id`, `review_text`, and `rating`. |
+| `POST /api/targets/{target_id}/ingestions` | Creates reviews through CSV ingestion only after parent authorization. |
+| `GET /api/targets/{target_id}/ingestions/latest` | Returns only the authorized target's latest ingestion result. |
+
+Review listing uses UUID order for deterministic paging: `limit` defaults to 50
+(1–100 allowed), and `offset` defaults to 0 (nonnegative). An owned target with no
+reviews returns `[]`. Missing and inaccessible targets both return
+`404 {"detail":"Analysis target not found."}`; missing/invalid authentication
+returns 401. Identity/target query parameters do not override the authenticated
+user or path target. Direct review creation, editing, and deletion endpoints are
+not exposed; ingestion is the only implemented review-write operation.
+
+Two-user regression tests in `backend/tests/test_target_workflow.py` verify reads,
+ingestion denial before CSV processing, unchanged stored targets/reviews/runs
+after denial, unavailable direct writes, and authentication requirements. They
+run against SQLite and PostgreSQL using the existing disposable-database fixture.
+
 ## Quality checks
 
 Run these before opening a pull request.

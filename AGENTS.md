@@ -437,3 +437,14 @@ branch provenance, validation and outstanding dependencies. Local code now adds
 protected target creation/read APIs, authoritative input validation, persisted
 CSV ingestion runs/reviews, latest-result retrieval, and protected browser forms.
 Primary URL ingestion and real PostgreSQL migration verification remain pending.
+
+
+### S1-023 verification update (2026-11-02)
+
+PR #28 is merged. Actual SQL migrations and ingestion outcome transactions now
+have PostgreSQL integration coverage in `backend/tests/test_target_workflow.py`.
+Set `TEST_POSTGRES_URL` to a disposable server with database-creation permission;
+the tests create/drop isolated databases. Backend CI supplies PostgreSQL 18.
+Hosted Supabase auth remains mocked; do not describe this as live Supabase testing.
+S1-023 acceptance is satisfied by CSV ingestion results; primary URL-provider
+integration remains S1-020 work, not an absolute prerequisite for S1-023 closure.

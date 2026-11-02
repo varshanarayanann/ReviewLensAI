@@ -1,6 +1,6 @@
 # Nidhi's Sprint 1 delivery and blockers
 
-Updated 2026-11-01. Local changes; no remote tickets closed or branches merged.
+Updated 2026-11-02. Implementation PR #28 is merged into main. S1-010 and S1-016 are closed. S1-023 acceptance verification is complete for the implemented CSV ingestion path; see the verification addendum below.
 
 ## Branch research
 
@@ -27,7 +27,7 @@ CSV contract: UTF-8 text, optional BOM, required rating/review_text headers, int
 - S1-020 (varshanarayanann): primary URL/provider ingestion is absent from all inspected branches. This delivery implements the documented CSV recovery path, not primary URL ingestion. Connect provider extraction/normalization to the same outcome transaction boundary when available.
 - S1-014: upstream model is still unmerged. Local integration reuses it; do not merge competing copies or renumber migrations without coordinating with Jasmine/Bhavyaa.
 - S1-018/021/022: supporting minimal workspace/CSV parser/review storage were necessary to exercise these tickets. Coordinate these interfaces with their owners before merging; the full review-list/dashboard experience and provider metadata handling are not delivered here.
-- Real PostgreSQL/Supabase migration verification remains pending. Apply 0001 then 0002 in a designated test database. SQLite tests exercise the ORM/API transaction flow, not PostgreSQL-specific auth-schema/default behavior.
+- PostgreSQL migration/workflow verification is now covered by automated tests applying the actual SQL migrations. Hosted Supabase configuration has not been exercised; tests create only the auth.users key needed by the migration.
 - No live Supabase logout/revocation or live provider testing performed.
 - Workspace uses a safe form-level validation summary; complete field-specific UI error mapping and broader UX specification compliance remain follow-up work.
 - No scheduler/recovery of processing runs after process termination; no retry/deduplication policy.
@@ -41,3 +41,24 @@ Frontend: temporary checksum-verified Node 22 runtime installed outside reposito
 ## Run locally
 
 Follow README environment setup. Apply backend/migrations/0001_create_analysis_targets.sql and 0002_create_ingestion_runs_and_reviews.sql to the intended test database before using new features. Start frontend and backend; log in, choose New target, create a Google Maps target, then upload a CSV with rating and review_text columns. Reload the workspace to verify recorded state. Try a malformed CSV after a successful import to verify a safe failure; existing persisted reviews should remain.
+
+
+## S1-023 acceptance verification (2026-11-02)
+
+The ticket requires recorded outcomes and user-visible confirmation/error handling; it does not require a URL provider. The earlier claim that S1-020 was an absolute prerequisite for closing S1-023 was too broad. URL ingestion remains separate provider integration work and does not invalidate the verified CSV result-handling path.
+
+A temporary unprivileged PostgreSQL 18.6 server verified the real SQL migrations and application workflow. Each test creates its own uniquely named database, supplies a minimal auth.users table (the Supabase-owned FK target), applies committed migrations in filename order, and removes only that test database afterward. No hosted Supabase project or existing application data was touched.
+
+Acceptance evidence:
+- Attempts are recorded separately in ingestion_runs.
+- Successful CSV imports persist reviews and report the committed count.
+- Invalid input records a safe failed outcome; previous reviews remain intact.
+- Latest-result retrieval through a new request returns the recorded outcome.
+- PostgreSQL transaction failure is followed by rollback and a committed failed attempt.
+- Failure logging contains run ID/exception class, not SQL or sensitive diagnostics.
+- Other users cannot initiate ingestion or retrieve the result.
+- Existing frontend tests verify safe result display; previous frontend CI passed.
+
+Backend validation: 78 tests passed with PostgreSQL enabled (SQLite and PostgreSQL workflow variants); Ruff check/format passed. CI now provisions PostgreSQL 18 and runs these same integration cases. Tests without TEST_POSTGRES_URL skip the two PostgreSQL variants, not the SQLite cases.
+
+To reproduce: point TEST_POSTGRES_URL at a disposable PostgreSQL server using a role allowed to create databases, then run `python -m pytest -ra` from backend. This variable is distinct from the application DATABASE_URL. Never use production credentials. The fixture creates/drops only its own random database; existing databases are not migrated or cleared.

@@ -58,3 +58,15 @@ After acceptance, a normalization/persistence failure returns a recorded `failed
 outcome with zero new reviews. HTTP 200 does not itself imply ingestion succeeded.
 `GET /api/targets/{target_id}/ingestions/latest` restores the latest recorded result.
 Client errors must use safe import guidance, never raw parser/database messages.
+
+## Source adapter
+
+`app.reviews.csv_source.parse_csv_reviews` reads the supplied source independently
+of the UI and database. It preserves raw text/rating and optional named metadata
+for normalization; current persistence stores text/rating only. Blank column names
+are rejected. Quoted commas, quotes, embedded newlines, and Unicode are supported.
+Python CSV per-field limits also apply and produce the same safe source error.
+Application code never substitutes fixture or sample reviews.
+
+See [the ingestion approach](review-ingestion-approach.md) for adapter boundaries,
+fixture provenance, tests, and normalization integration notes.

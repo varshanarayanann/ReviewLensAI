@@ -78,7 +78,7 @@ def test_denial_happens_before_source_parsing_or_attempt_creation(
     def forbidden_parser(*args, **kwargs):
         pytest.fail("Unauthorized or missing targets must not parse CSV")
 
-    monkeypatch.setattr("app.api.targets.csv.DictReader", forbidden_parser)
+    monkeypatch.setattr("app.api.targets.parse_csv_reviews", forbidden_parser)
     for index, (headers, _) in enumerate(source_targets):
         target = str(uuid4()) if unknown else source_targets[1 - index][1]
         response = client.post(
@@ -96,7 +96,7 @@ def test_authentication_is_required_before_processing(
     def forbidden_parser(*args, **kwargs):
         pytest.fail("Unauthenticated requests must not parse CSV")
 
-    monkeypatch.setattr("app.api.targets.csv.DictReader", forbidden_parser)
+    monkeypatch.setattr("app.api.targets.parse_csv_reviews", forbidden_parser)
     before = stored_rows(database)
     headers = {"X-User-Id": USER_A_ID}
     if token is not None:

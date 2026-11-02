@@ -232,8 +232,8 @@ The committed `.env.example` files list every required name. Never commit secret
 | `CORS_ORIGINS` | Yes | Comma-separated frontend origins allowed to call the API, e.g. `http://localhost:5173` |
 | `SUPABASE_URL` | Yes | Supabase project URL, e.g. `https://<project-ref>.supabase.co`. Used to fetch the public keys that verify login tokens |
 | `SUPABASE_PUBLISHABLE_KEY` | Yes | Supabase publishable (or anon) key, the same public value as `VITE_SUPABASE_ANON_KEY`. Used to confirm with Supabase Auth that a login session is still active, so a token stops working as soon as its user logs out. The backend refuses an `sb_secret_` key here |
-| `REVIEW_PROVIDER_API_KEY` | From S1-020 | **Secret.** API key for the Google Maps review-data provider |
-| `REVIEW_MAX_PER_RUN` | From S1-020 | Maximum reviews collected in one ingestion run |
+| `REVIEW_PROVIDER_API_KEY` | Future URL integration | Reserved server-side secret placeholder; not read by Settings or required for the S1-020 CSV import path |
+| `REVIEW_MAX_PER_RUN` | Future URL integration | Reserved provider cap; current CSV imports use a fixed maximum of 1,000 records |
 
 The backend refuses to start and names the missing variables if a required value is absent.
 `DATABASE_URL` is stored as a secret value, so it prints as `**********` in logs and errors.
@@ -248,6 +248,20 @@ The backend refuses to start and names the missing variables if a required value
 
 Every `VITE_*` value is visible in the browser. Only public values belong here;
 the Supabase service-role key and database password must never appear in the frontend.
+
+## Review source import (S1-020)
+
+ReviewLens obtains individual review text/rating records from user-supplied CSV
+exports for an authorized Google Maps target. The pure adapter in
+`backend/app/reviews/csv_source.py` handles CSV structure independently of the UI,
+HTTP routes, and persistence; it preserves optional metadata for normalization.
+Source rejection never inserts sample reviews or substitutes test fixtures.
+
+See [the selected ingestion approach](docs/review-ingestion-approach.md) and
+[CSV format](docs/csv-import-format.md) for limits, fixture provenance, and normalization
+integration notes. This implements the issue's practical-import option;
+automatic collection from the saved Google Maps URL still requires a separately
+selected/configured provider integration. No provider key is needed for CSV.
 
 ## Ingestion source submission (S1-019)
 

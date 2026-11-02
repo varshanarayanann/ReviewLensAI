@@ -390,7 +390,7 @@ def test_cross_user_ingestion_denied_before_processing(
     def forbidden_parser(*args, **kwargs):
         pytest.fail("Denied ingestion must not parse or process review data")
 
-    monkeypatch.setattr("app.api.targets.csv.DictReader", forbidden_parser)
+    monkeypatch.setattr("app.api.targets.parse_csv_reviews", forbidden_parser)
     for index, auth in enumerate(headers):
         response = client.post(
             f"/api/targets/{targets[1 - index]}/ingestions",

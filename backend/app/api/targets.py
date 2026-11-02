@@ -78,6 +78,37 @@ class CsvImport(BaseModel):
     csv_text: str = Field(min_length=1, max_length=1_000_000)
 
 
+def read_csv_source(csv_text: str) -> list[dict[str, str | None]]:
+    """Check required import structure after ownership, before recording work.
+
+    Review text/rating normalization remains part of the recorded ingestion.
+    This preflight only establishes that a bounded CSV source was supplied.
+    """
+    try:
+        if len(csv_text.encode("utf-8")) > 1_000_000:
+            raise ValueError("source size")
+        reader = csv.DictReader(io.StringIO(csv_text.lstrip("\ufeff")), strict=True)
+        headers = reader.fieldnames or []
+        if not {"rating", "review_text"}.issubset(headers):
+            raise ValueError("required columns")
+        if len(headers) != len(set(headers)):
+            raise ValueError("duplicate columns")
+        records = []
+        for row in reader:
+            if None in row or len(records) >= 1000:
+                raise ValueError("malformed row or source limit")
+            records.append(row)
+        if not records:
+            raise ValueError("missing records")
+        return records
+    except (csv.Error, ValueError):
+        raise HTTPException(
+            422,
+            "Provide a CSV with rating and review_text columns and 1–1,000 "
+            "reviews (maximum 1 MB).",
+        ) from None
+
+
 @router.post("/{target_id}/ingestions", response_model=IngestionResult)
 def ingest(
     target_id: UUID,
@@ -87,22 +118,18 @@ def ingest(
 ):
     # Child records inherit ownership from this authorized, persisted target.
     target = owned(target_id, user, db)
+    records = read_csv_source(body.csv_text)
     run = IngestionRun(target_id=target.id)
     db.add(run)
     db.commit()
     db.refresh(run)
     run_id = run.id
     try:
-        reader = csv.DictReader(
-            io.StringIO(body.csv_text.lstrip("\ufeff")), strict=True
-        )
-        if not {"rating", "review_text"}.issubset(reader.fieldnames or []):
-            raise ValueError("columns")
         rows = []
-        for row in reader:
+        for row in records:
             rating = int(row.get("rating") or "")
             text = (row.get("review_text") or "").strip()
-            if not text or rating not in range(1, 6) or len(rows) >= 1000:
+            if not text or rating not in range(1, 6):
                 raise ValueError("invalid record or limit")
             rows.append(
                 Review(

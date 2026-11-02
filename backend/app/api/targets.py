@@ -4,7 +4,7 @@ import logging
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -37,7 +37,14 @@ def create_target(
     user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    target = AnalysisTarget(id=uuid4(), owner_id=UUID(user.id), **body.model_dump())
+    # Ownership comes only from verified auth; copy editable fields explicitly.
+    target = AnalysisTarget(
+        id=uuid4(),
+        owner_id=UUID(user.id),
+        name=body.name,
+        platform=body.platform,
+        source_url=body.source_url,
+    )
     db.add(target)
     db.commit()
     db.refresh(target)
@@ -45,6 +52,8 @@ def create_target(
 
 
 class CsvImport(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     csv_text: str = Field(min_length=1, max_length=1_000_000)
 
 
@@ -55,8 +64,9 @@ def ingest(
     user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    owned(target_id, user, db)
-    run = IngestionRun(target_id=target_id)
+    # Child records inherit ownership from this authorized, persisted target.
+    target = owned(target_id, user, db)
+    run = IngestionRun(target_id=target.id)
     db.add(run)
     db.commit()
     db.refresh(run)
@@ -75,7 +85,7 @@ def ingest(
                 raise ValueError("invalid record or limit")
             rows.append(
                 Review(
-                    target_id=target_id, run_id=run_id, review_text=text, rating=rating
+                    target_id=target.id, run_id=run_id, review_text=text, rating=rating
                 )
             )
         if not rows:

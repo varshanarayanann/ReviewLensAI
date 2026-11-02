@@ -12,7 +12,7 @@ ReviewLens allows multiple users to create AnalysisTargets and collect reviews. 
 
 ## 2. Identity and Data Ownership
 
-After authentication, Supabase Auth provides a unique user identifier that ReviewLens will use to associate the authenticated account with its application data. The FastAPI backend must verify the user's authentication token before using this identifier to determine which AnalysisTargets belong to them (S1-BR-005). If ReviewLens maintains a separate User record, it must be linked to the verified Supabase user ID. This allows ReviewLens to identify which AnalysisTargets belong to the user without relying on an owner ID submitted from the browser.
+After authentication, Supabase Auth provides a unique user identifier exposed to backend routes as `CurrentUser.id`. This verified identity maps directly to `AnalysisTarget.owner_id`; target ownership is derived from the authenticated user, not an owner ID submitted from the browser (S1-BR-005). The current implementation does not use a separate application User record.
 
 The following records are user-scoped:
 
@@ -25,7 +25,7 @@ Although reviews and ingestion runs may not store an owner ID directly, they mus
 
 ## 3. Authorization and Prohibited Access
 
-Authentication alone does not grant permission to access every record. Before reading, creating, updating, deleting, or ingesting user-owned data, the backend or database security layer must verify ownership (S1-BR-008–009). For example, when a user requests an AnalysisTarget, the application must confirm that the requested target belongs to the user identified by the verified session. If ownership cannot be confirmed, the request must be denied.
+Authentication alone does not grant permission to access every record. The current implementation enforces ownership authorization through FastAPI backend queries using the verified `CurrentUser.id` (S1-BR-008–009). For example, when a user requests an AnalysisTarget, the query checks that the requested target belongs to the authenticated user. If ownership cannot be confirmed, the request must be denied. Do not rely on Supabase Row Level Security (RLS) as an enforcement layer unless it is separately verified and documented.
 
 **Do not:**
 
@@ -62,6 +62,6 @@ These tests must verify backend behavior rather than relying only on what appear
 
 Before merging changes, developers and AI coding tools must verify authentication, enforce ownership on every user-owned operation, protect secrets, add appropriate negative-path tests, and confirm required CI checks pass. **Every query and mutation involving user-owned data must preserve user isolation.**
 
-**Implementation decisions to verify:** The verified Supabase subject is exposed to backend routes as the current user's identity. Authentication and active-session verification are implemented, but cross-user ownership authorization must be verified through S1-012, S1-013, and their associated tests; a valid session alone is not proof of access to a target, review, or ingestion run. Confirm that every user-owned read and mutation is constrained by the authenticated owner, whether enforced through FastAPI, Supabase Row Level Security (RLS), or both. Environment variable names and local conventions are established in the example files and backend settings; deployment configuration should follow the hosting platform's protected settings.
+**Current implementation:** The verified Supabase subject is exposed to backend routes as `CurrentUser.id` and maps directly to `AnalysisTarget.owner_id`. FastAPI backend queries enforce ownership using that verified identity; a valid session alone is not proof of access to a target, review, or ingestion run. No claim is made here that Supabase Row Level Security (RLS) is enabled. Environment variable names and local conventions are established in the example files and backend settings; deployment configuration should follow the hosting platform's protected settings.
 
 *References: Sprint 1 Stories (S1-003; S1-BR-001–011), ReviewLens Technical Specifications §3, Product Requirements Document §§4.1 and 7.*

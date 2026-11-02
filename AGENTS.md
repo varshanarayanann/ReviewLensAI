@@ -11,8 +11,10 @@ Research snapshot: **2026-11-01**, default branch `main`, commit **`aeb68cc7c6bd
 - Repository description calls the team **JAVNB**; the board uses **JAVBN**. Preserve existing names rather than assuming one spelling is authoritative.
 - Requirements available locally: [Sprint1Issues.csv](Sprint1Issues.csv), containing all 23 Sprint 1 stories and their business-rule references.
 - Setup and delivery baseline: [README.md](README.md).
+- Engineering conventions (S1-001): [docs/context/engineering-coding-standards.md](docs/context/engineering-coding-standards.md). Read before modifying code; reviewed against `main` at `624bbf1` on 2026-11-02. The older implementation inventory below remains a dated snapshot.
 - Detailed UI specification: [docs/context/ui-ux-standards.md](docs/context/ui-ux-standards.md).
 - Database change policy: [backend/migrations/README.md](backend/migrations/README.md).
+- S1-011 ownership contract: see [README.md — Record ownership](README.md#record-ownership-s1-011). Targets persist the verified Supabase subject; reviews/runs inherit ownership through the authorized target. Creation/import bodies reject extra fields. Regression coverage is in `backend/tests/test_target_workflow.py`; the historical inventory below predates these endpoints.
 
 **Evidence labels in this guide:** implemented means present in the inspected `main`; planned means required by stories or team documentation; branch-only means inspected but unmerged. A closed issue or a Done board card does not prove its files exist on `main`.
 
@@ -463,6 +465,19 @@ CSV ingestion runs/reviews, latest-result retrieval, and protected browser forms
 Primary URL ingestion and real PostgreSQL migration verification remain pending.
 
 
+### S1-017 target-list update (2026-11-02, branch work)
+
+`GET /api/targets` returns only the verified user's persisted targets, filtered
+by owner in SQL and ordered by `created_at DESC, id DESC`. Response fields are
+`id`, `name`, `platform`, `source_url`, and `created_at`. The Dashboard uses typed
+API calls and shared target cards with loading/empty/error/retry states; account
+changes clear old list state and stale responses are ignored. See
+[README — My analysis targets](README.md#my-analysis-targets-s1-017).
+Backend isolation tests live in `backend/tests/test_target_listing.py` and reuse
+the SQLite/PostgreSQL fixture; dashboard tests are colocated with the page.
+This branch supersedes the historical inventory's placeholder-dashboard and
+missing-list-endpoint descriptions without implying it is already merged.
+
 ### S1-023 verification update (2026-11-02)
 
 PR #28 is merged. Actual SQL migrations and ingestion outcome transactions now
@@ -472,3 +487,17 @@ the tests create/drop isolated databases. Backend CI supplies PostgreSQL 18.
 Hosted Supabase auth remains mocked; do not describe this as live Supabase testing.
 S1-023 acceptance is satisfied by CSV ingestion results; primary URL-provider
 integration remains S1-020 work, not an absolute prerequisite for S1-023 closure.
+
+### S1-013 authorization update (2026-11-02, branch work)
+
+`GET /api/targets/{target_id}/reviews` authorizes the parent with the existing
+`owned` helper before querying target-scoped reviews. It returns a JSON array of
+`id`, `target_id`, `run_id`, `review_text`, and `rating`, ordered by review UUID;
+`limit` defaults to 50 (1–100), and `offset` defaults to 0 (nonnegative).
+See [README — Review and ingestion authorization](README.md#review-and-ingestion-authorization-s1-013)
+for the child-operation contract. Direct review mutation APIs are not exposed;
+CSV ingestion remains the only implemented write path. Two-user tests in
+`backend/tests/test_target_workflow.py` cover data isolation and denied operations
+leaving all stored rows unchanged on SQLite and PostgreSQL. This supersedes the
+older snapshot's statement that review listing is unimplemented when this branch
+is present; it does not imply a merged release or frontend review-list UI.

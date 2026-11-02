@@ -5,6 +5,8 @@ export const MESSAGES = {
   csvRecovery: 'Upload reviews from a CSV with rating and review_text columns. Ratings must be integers from 1 to 5. Maximum 1,000 reviews. Invalid rows reject the entire import; existing reviews are retained.',
   ingestionUnavailable: 'Collection from the saved Google Maps URL is not available yet. You can upload a CSV instead.',
   ingestionBusy: 'Ingestion is already running. Refresh the workspace to check its result.',
+  noTargets: 'No analysis targets yet',
+  addTarget: 'Add a Google Maps business to start analyzing its reviews.',
   formSummary: 'Please fix the highlighted fields.',
   emailRequired: 'Enter your email address.',
   emailInvalid: 'Enter a valid email address, like name@example.com.',

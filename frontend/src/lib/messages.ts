@@ -1,0 +1,16 @@
+export const MESSAGES = {
+  formSummary: 'Please fix the highlighted fields.',
+  emailRequired: 'Enter your email address.',
+  emailInvalid: 'Enter a valid email address, like name@example.com.',
+  passwordRequired: 'Enter your password.',
+  passwordTooShort: 'Password must be at least 8 characters.',
+  passwordsDontMatch: "Passwords don't match.",
+  invalidCredentials: 'Email or password is incorrect.',
+  emailExists: 'An account with this email already exists. Log in instead.',
+  emailNotConfirmed: 'Confirm your email address using the link we sent you, then log in.',
+  confirmationSent: 'Account created. Check your email for a confirmation link, then log in.',
+  tooManyAttempts: 'Too many attempts. Wait a few minutes and try again.',
+  sessionEnded: 'Your session has ended. Please log in again.',
+  offline: 'You appear to be offline. Check your connection and try again.',
+  unexpected: 'Something went wrong on our side. Try again, and contact the team if it keeps happening.',
+} as const

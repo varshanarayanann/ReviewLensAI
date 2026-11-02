@@ -8,4 +8,6 @@ Version-controlled SQL migrations for the ReviewLens Postgres database (Supabase
 - Apply a migration by running its SQL against the database in `DATABASE_URL`
   (Supabase Dashboard > SQL Editor, or `psql "$DATABASE_URL" -f <file>`).
 
-The first migrations (AnalysisTarget, IngestionRun, Review) are added by S1-014, S1-022, and S1-023.
+Migration `0001_create_analysis_targets.sql` creates the AnalysisTarget table
+with its Supabase Auth owner reference. Later migrations add IngestionRun and
+Review as part of S1-022 and S1-023.

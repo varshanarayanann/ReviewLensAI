@@ -1,3 +1,4 @@
+import { Link } from 'react-router'
 import { useEffect, useState } from 'react'
 import { AppShell } from '../components/layout/AppShell'
 import { Alert } from '../components/ui/Alert'
@@ -40,6 +41,7 @@ export default function DashboardPage({ apiBaseUrl }: { apiBaseUrl: string }) {
   return (
     <AppShell>
       <h1>Dashboard</h1>
+      <Link to="/targets/new">New target</Link>
       <p className="muted">Your analysis targets will appear here.</p>
       <div className="stack">
         {state.kind === 'loading' && <Skeleton width={280} height={20} />}

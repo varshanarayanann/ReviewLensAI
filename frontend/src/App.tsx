@@ -4,6 +4,7 @@ import type { AuthClient } from './lib/auth/AuthContext'
 import { AuthProvider } from './lib/auth/AuthProvider'
 import type { AppConfig } from './lib/config'
 import DashboardPage from './pages/DashboardPage'
+import AnalysisTargetWorkspacePage from './pages/AnalysisTargetWorkspacePage'
 import LoginPage from './pages/LoginPage'
 import NotFoundPage from './pages/NotFoundPage'
 import TargetWorkflowPage from './pages/TargetWorkflowPage'
@@ -25,7 +26,7 @@ export default function App({ config, authClient }: AppProps) {
         </Route>
         <Route element={<ProtectedRoute />}>
           <Route path="/targets/new" element={<TargetWorkflowPage apiBaseUrl={config.apiBaseUrl} />} />
-          <Route path="/targets/:targetId" element={<TargetWorkflowPage apiBaseUrl={config.apiBaseUrl} />} />
+          <Route path="/targets/:targetId" element={<AnalysisTargetWorkspacePage apiBaseUrl={config.apiBaseUrl} />} />
           <Route path="/dashboard" element={<DashboardPage apiBaseUrl={config.apiBaseUrl} />} />
         </Route>
         <Route path="*" element={<NotFoundPage />} />

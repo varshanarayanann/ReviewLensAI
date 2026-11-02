@@ -15,7 +15,7 @@ from app.db import get_db
 from app.models import AnalysisTarget
 from app.models.ingestion import IngestionRun, Review
 from app.schemas import target_list
-from app.schemas.analysis_target import AnalysisTargetCreate
+from app.schemas.analysis_target import AnalysisTargetCreate, AnalysisTargetRead
 from app.schemas.ingestion_result import IngestionResult
 from app.schemas.review import ReviewResponse
 
@@ -153,14 +153,14 @@ def latest(
     )
 
 
-@router.get("/{target_id}")
+@router.get("/{target_id}", response_model=AnalysisTargetRead)
 def read_target(
     target_id: UUID,
     user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     target = owned(target_id, user, db)
-    return {"id": target.id, "name": target.name, "source_url": target.source_url}
+    return target
 
 
 @router.get("", response_model=list[target_list.AnalysisTargetResponse])

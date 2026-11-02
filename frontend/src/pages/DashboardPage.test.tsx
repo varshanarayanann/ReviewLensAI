@@ -38,7 +38,9 @@ it('shows the name, platform, source, and workspace link from the owned target r
     url.endsWith('/latest') ? null : target,
   )))
   fireEvent.click(link)
-  expect(await screen.findByRole('heading', { name: 'Import reviews' })).toBeInTheDocument()
+  expect(await screen.findByRole('heading', { name: target.name })).toBeInTheDocument()
+  expect(screen.getByText('Not ingested')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Upload reviews' })).toBeEnabled()
 })
 
 it('shows an actionable empty state', async () => {

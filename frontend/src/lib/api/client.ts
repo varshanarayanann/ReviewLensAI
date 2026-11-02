@@ -7,12 +7,36 @@ export interface CurrentUserResponse {
   email: string | null
 }
 
-export interface AnalysisTargetResponse {
+export interface WorkspaceTargetResponse {
   id: string
   name: string
   platform: 'google_maps'
   source_url: string
+}
+
+export interface AnalysisTargetResponse extends WorkspaceTargetResponse {
   created_at: string
+}
+
+export interface IngestionResultResponse {
+  run_id: string
+  target_id: string
+  state: 'processing' | 'succeeded' | 'failed'
+  persisted_count: number
+  message: string
+}
+
+export async function getWorkspace(base: string, targetId: string, token: string) {
+  const path = `/${encodeURIComponent(targetId)}`
+  const target = await targetRequest<WorkspaceTargetResponse>(base, path, token)
+  const result = await targetRequest<IngestionResultResponse | null>(base, `${path}/ingestions/latest`, token)
+  return { target, result }
+}
+
+export function uploadReviews(base: string, targetId: string, token: string, csvText: string) {
+  return targetRequest<IngestionResultResponse>(
+    base, `/${encodeURIComponent(targetId)}/ingestions`, token, { csv_text: csvText },
+  )
 }
 
 export async function getTargets(

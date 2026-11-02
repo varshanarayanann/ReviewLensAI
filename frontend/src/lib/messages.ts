@@ -1,4 +1,6 @@
 export const MESSAGES = {
+  noTargets: 'No analysis targets yet',
+  addTarget: 'Add a Google Maps business to start analyzing its reviews.',
   formSummary: 'Please fix the highlighted fields.',
   emailRequired: 'Enter your email address.',
   emailInvalid: 'Enter a valid email address, like name@example.com.',

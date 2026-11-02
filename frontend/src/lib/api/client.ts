@@ -7,6 +7,25 @@ export interface CurrentUserResponse {
   email: string | null
 }
 
+export interface AnalysisTargetResponse {
+  id: string
+  name: string
+  platform: 'google_maps'
+  source_url: string
+  created_at: string
+}
+
+export async function getTargets(
+  apiBaseUrl: string,
+  accessToken: string,
+): Promise<AnalysisTargetResponse[]> {
+  const response = await fetch(`${apiBaseUrl}/api/targets`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+  if (!response.ok) throw new ApiError(response.status)
+  return (await response.json()) as AnalysisTargetResponse[]
+}
+
 export class ApiError extends Error {
   readonly status: number
 

@@ -14,6 +14,7 @@ from app.auth.tokens import CurrentUser
 from app.db import get_db
 from app.models import AnalysisTarget
 from app.models.ingestion import IngestionRun, Review
+from app.schemas import target_list
 from app.schemas.analysis_target import AnalysisTargetCreate
 from app.schemas.ingestion_result import IngestionResult
 from app.schemas.review import ReviewResponse
@@ -160,3 +161,15 @@ def read_target(
 ):
     target = owned(target_id, user, db)
     return {"id": target.id, "name": target.name, "source_url": target.source_url}
+
+
+@router.get("", response_model=list[target_list.AnalysisTargetResponse])
+def list_targets(
+    user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return db.scalars(
+        select(AnalysisTarget)
+        .where(AnalysisTarget.owner_id == UUID(user.id))
+        .order_by(AnalysisTarget.created_at.desc(), AnalysisTarget.id.desc())
+    ).all()

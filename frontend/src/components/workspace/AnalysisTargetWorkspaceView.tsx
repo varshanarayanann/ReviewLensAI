@@ -1,4 +1,6 @@
+import type { ReactNode } from 'react'
 import { Link } from 'react-router'
+import { MESSAGES } from '../../lib/messages'
 import { Alert } from '../ui/Alert'
 import { Skeleton } from '../ui/Skeleton'
 
@@ -13,118 +15,53 @@ export interface AnalysisTargetWorkspaceData {
 
 export type AnalysisTargetWorkspaceState =
   | { kind: 'loading' }
-  | { kind: 'unavailable' }
   | { kind: 'missing' }
   | { kind: 'forbidden' }
   | { kind: 'error'; message: string }
   | { kind: 'ready'; target: AnalysisTargetWorkspaceData }
 
 const ingestionLabels: Record<IngestionState | 'not-ingested', string> = {
-  processing: 'Ingesting',
-  succeeded: 'Ingested',
-  partial: 'Partially ingested',
-  failed: 'Failed',
-  'not-ingested': 'Not ingested',
+  processing: 'Ingesting', succeeded: 'Ingested', partial: 'Partially ingested',
+  failed: 'Failed', 'not-ingested': 'Not ingested',
 }
 
-export function AnalysisTargetWorkspaceView({
-  state,
-}: {
+export function AnalysisTargetWorkspaceView({ state, children }: {
   state: AnalysisTargetWorkspaceState
+  children?: ReactNode
 }) {
-  if (state.kind === 'loading') {
-    return (
-      <section className="workspace-content" aria-busy="true">
-        <h1>Analysis target workspace</h1>
-        <div className="stack">
-          <Skeleton width={280} height={24} />
-          <Skeleton height={72} />
-          <Skeleton width={180} height={36} />
-        </div>
-      </section>
-    )
-  }
+  if (state.kind === 'loading') return (
+    <section className="workspace-content" aria-busy="true" aria-label="Loading workspace">
+      <h1>Analysis workspace</h1>
+      <div className="stack"><Skeleton width="100%" height={24} /><Skeleton height={72} /></div>
+    </section>
+  )
 
   if (state.kind === 'ready') {
-    const ingestionState = state.target.latestIngestionState ?? 'not-ingested'
-
+    const status = state.target.latestIngestionState ?? 'not-ingested'
     return (
       <section className="workspace-content">
         <h1>{state.target.name}</h1>
         <dl className="workspace-details">
-          <div>
-            <dt>Review platform</dt>
-            <dd>{state.target.platform}</dd>
-          </div>
-          <div>
-            <dt>Source reference</dt>
-            <dd className="workspace-source">{state.target.sourceReference}</dd>
-          </div>
-          <div>
-            <dt>Ingestion status</dt>
-            <dd>
-              <span className={`workspace-status workspace-status--${ingestionState}`}>
-                {ingestionLabels[ingestionState]}
-              </span>
-            </dd>
-          </div>
+          <div><dt>Review platform</dt><dd>{state.target.platform}</dd></div>
+          <div><dt>Source reference</dt><dd className="workspace-source">
+            <a href={state.target.sourceReference} target="_blank" rel="noopener noreferrer"
+              title={state.target.sourceReference}>{state.target.sourceReference}</a>
+          </dd></div>
+          <div><dt>Ingestion status</dt><dd>
+            <span className={`workspace-status workspace-status--${status}`}>{ingestionLabels[status]}</span>
+          </dd></div>
         </dl>
-        <section className="workspace-ingestion">
-          <h2>Reviews</h2>
-          <button className="button button--primary" type="button" disabled>
-            Ingest reviews
-          </button>
-          <p className="muted">
-            Ingestion is unavailable until the S1-019 backend integration is implemented.
-          </p>
-        </section>
+        {children}
+        <Link to="/dashboard">Back to dashboard</Link>
       </section>
     )
   }
 
-  const content = {
-    unavailable: {
-      title: 'Target details unavailable',
-      description:
-        'The authorized target-read integration is not available yet. No target details have been loaded.',
-      variant: 'info' as const,
-    },
-    missing: {
-      title: 'Analysis target not found',
-      description: 'This target could not be found.',
-      variant: 'danger' as const,
-    },
-    forbidden: {
-      title: 'Access denied',
-      description: "You don't have access to this analysis target.",
-      variant: 'danger' as const,
-    },
-    error: {
-      title: 'Could not load analysis target',
-      description: '',
-      variant: 'danger' as const,
-    },
-  }[state.kind]
-  const description = state.kind === 'error' ? state.message : content.description
-
   return (
     <section className="workspace-content">
-      <h1>{content.title}</h1>
-      <Alert variant={content.variant}>{description}</Alert>
-      {state.kind === 'unavailable' && (
-        <section className="workspace-ingestion">
-          <h2>Reviews</h2>
-          <button className="button button--primary" type="button" disabled>
-            Ingest reviews
-          </button>
-          <p className="muted">
-            Ingestion is unavailable until the S1-019 backend integration is implemented.
-          </p>
-        </section>
-      )}
-      <Link to="/dashboard" className="button button--secondary workspace-dashboard-link">
-        Back to dashboard
-      </Link>
+      <h1>{state.kind === 'error' ? 'Could not load analysis target' : 'Analysis target not found'}</h1>
+      <Alert variant="danger">{state.kind === 'error' ? state.message : MESSAGES.targetNotFound}</Alert>
+      <Link to="/dashboard" className="button button--secondary workspace-dashboard-link">Back to dashboard</Link>
     </section>
   )
 }

@@ -26,9 +26,8 @@ export default function App({ config, authClient }: AppProps) {
         </Route>
         <Route element={<ProtectedRoute />}>
           <Route path="/targets/new" element={<TargetWorkflowPage apiBaseUrl={config.apiBaseUrl} />} />
-          <Route path="/targets/:targetId" element={<TargetWorkflowPage apiBaseUrl={config.apiBaseUrl} />} />
+          <Route path="/targets/:targetId" element={<AnalysisTargetWorkspacePage apiBaseUrl={config.apiBaseUrl} />} />
           <Route path="/dashboard" element={<DashboardPage apiBaseUrl={config.apiBaseUrl} />} />
-          <Route path="/targets/:targetId" element={<AnalysisTargetWorkspacePage />} />
         </Route>
         <Route path="*" element={<NotFoundPage />} />
       </Routes>

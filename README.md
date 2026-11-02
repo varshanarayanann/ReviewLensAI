@@ -205,3 +205,20 @@ the Supabase service-role key and database password must never appear in the fro
 
 Schema changes are SQL files in `backend/migrations/`, applied in filename order.
 See `backend/migrations/README.md`.
+
+## Analysis workspace (S1-018)
+
+`/targets/:targetId` loads the authorized target and its latest recorded ingestion
+result through FastAPI. The workspace displays the target name, Google Maps
+platform, saved source URL, and current basic ingestion status. The protected
+`GET /api/targets/{targetId}` response includes `id`, `name`, `platform`, and
+`source_url`; inaccessible and missing targets both return 404.
+
+Use **Upload a CSV** for the implemented ingestion path, then **Refresh workspace**
+to reload the persisted result. CSV import uses the existing API and limits;
+collection directly from the saved Google Maps URL remains provider-integration
+work. Dashboard card selection is delivered separately by S1-017; direct links
+and navigation after target creation work without it.
+
+The original S1-018 author can integrate the completed feature and update her
+existing draft PR using [the handoff instructions](docs/handoffs/s1-018-workspace.md).

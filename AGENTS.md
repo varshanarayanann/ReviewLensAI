@@ -429,6 +429,18 @@ Key unresolved items to keep visible:
 
 Research basis: the complete tracked main source/config/test tree, all Sprint 1 issue bodies and CSV, public project board data (all 23 items), repository issue/PR metadata, the sole issue discussion on #20, both open PR diffs, all listed branch heads and relevant unique branch work, and the main-commit CI job results. Authenticated Projects API access lacked `read:project`; public board HTML supplied the board snapshot instead. No private course documents or live service configuration were assumed.
 
+## S1-018 handoff update (2026-11-02, branch work)
+
+The dedicated handoff branch continues the original S1-018 workspace foundation
+and merges current main into that feature branch. There is one workspace route,
+an additive `platform` field on the authorized target-read contract, persisted
+status retrieval, and working CSV import. Missing/forbidden presentation is
+identical, and route/account changes clear stale state. See
+[the handoff](docs/handoffs/s1-018-workspace.md) for provenance, test evidence,
+scope limits, and commands for the original author to update draft PR #30.
+No new PR is created for this handoff; main and the original remote branch are
+not updated. This branch supersedes the snapshot's unavailable workspace status.
+
 ## Local implementation update (2026-11-01, unmerged)
 
 The original main snapshot above predates the current local Nidhi changes. See

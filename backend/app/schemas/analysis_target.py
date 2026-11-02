@@ -1,7 +1,17 @@
 from typing import Literal
 from urllib.parse import urlsplit
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
+class AnalysisTargetRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    name: str
+    platform: Literal["google_maps"]
+    source_url: str
 
 
 class AnalysisTargetCreate(BaseModel):

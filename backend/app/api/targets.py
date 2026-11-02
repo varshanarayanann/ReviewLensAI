@@ -3,7 +3,7 @@ import io
 import logging
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -15,12 +15,13 @@ from app.models import AnalysisTarget
 from app.models.ingestion import IngestionRun, Review
 from app.schemas.analysis_target import AnalysisTargetCreate
 from app.schemas.ingestion_result import IngestionResult
+from app.schemas.review import ReviewResponse
 
 router = APIRouter(prefix="/api/targets", dependencies=[Depends(get_current_user)])
 logger = logging.getLogger(__name__)
 
 
-def owned(target_id: UUID, user: CurrentUser, db: Session):
+def owned(target_id: UUID, user: CurrentUser, db: Session) -> AnalysisTarget:
     target = db.scalar(
         select(AnalysisTarget).where(
             AnalysisTarget.id == target_id, AnalysisTarget.owner_id == UUID(user.id)
@@ -29,6 +30,24 @@ def owned(target_id: UUID, user: CurrentUser, db: Session):
     if target is None:
         raise HTTPException(404, "Analysis target not found.")
     return target
+
+
+@router.get("/{target_id}/reviews", response_model=list[ReviewResponse])
+def list_reviews(
+    target_id: UUID,
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    target = owned(target_id, user, db)
+    return db.scalars(
+        select(Review)
+        .where(Review.target_id == target.id)
+        .order_by(Review.id)
+        .limit(limit)
+        .offset(offset)
+    ).all()
 
 
 @router.post("", status_code=201)

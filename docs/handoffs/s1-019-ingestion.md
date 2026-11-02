@@ -112,3 +112,21 @@ S1-020 URL/provider extraction and S1-021 normalization integration are separate
 work. This handoff does not choose a provider or change the current all-or-nothing
 record policy into partial success. Reconcile those contracts explicitly when
 integrating the normalization branch.
+
+## Combining with S1-011 / PR #34
+
+Both branches touch ingestion ownership setup, so a merge-tree check found a
+small conflict in `backend/app/api/targets.py`. Retain the shared forbidden-extra
+request configuration once, S1-011's explicit target creation fields, and this
+ingestion order:
+
+```python
+target = owned(target_id, user, db)
+records = read_csv_source(body.csv_text)
+run = IngestionRun(target_id=target.id)
+db.add(run)
+```
+
+Keep review `target_id=target.id` and iterate over the validated `records`.
+Do not drop source preflight while resolving the conflict or move it before the
+ownership check. S1-013 / PR #35 passed a merge-tree compatibility check directly.

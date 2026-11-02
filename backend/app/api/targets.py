@@ -90,8 +90,8 @@ def ingest(
 ):
     # Child records inherit ownership from this authorized, persisted target.
     target = owned(target_id, user, db)
-    run = IngestionRun(target_id=target.id)
     records = read_csv_source(body.csv_text)
+    run = IngestionRun(target_id=target.id)
     db.add(run)
     db.commit()
     db.refresh(run)

@@ -100,6 +100,14 @@ move the S1-019 rejected-source/file-retention assertion to the workspace tests
 using `Reviews CSV file *`; S1-018 already covers upload 422 safe-error handling.
 Use the shared CSV-source guidance where appropriate and rerun the full suites.
 
+A merge-tree check against the published S1-018 handoff found a conflict in
+`frontend/src/pages/TargetWorkflowPage.test.tsx`. The old page implementation
+auto-merges but must still be reviewed: retain S1-018's create-only version,
+without the old `targetId` conditional or unused message import. Do not interpret
+an automatic merge as proof that TypeScript or combined UI tests will pass.
+Combine these features when updating against main after the other PR merges, or
+use a deliberately stacked PR; do not accidentally submit both issues as one PR.
+
 S1-020 URL/provider extraction and S1-021 normalization integration are separate
 work. This handoff does not choose a provider or change the current all-or-nothing
 record policy into partial success. Reconcile those contracts explicitly when

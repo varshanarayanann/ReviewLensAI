@@ -124,6 +124,21 @@ it('validates and focuses the file input without sending invalid CSV selections'
   expect(fetchMock).toHaveBeenCalledTimes(2)
 })
 
+it('maps rejected CSV sources to safe guidance and retains the selected file', async () => {
+  fetchMock.mockImplementation((url: string, options?: RequestInit) => Promise.resolve(
+    options?.method === 'POST'
+      ? json({ detail: 'private parser detail' }, 422)
+      : json(url.endsWith('/latest') ? null : target),
+  ))
+  showWorkspace()
+  await screen.findByRole('heading', { name: target.name })
+  const file = chooseFile()
+  fireEvent.submit(screen.getByRole('button', { name: 'Upload reviews' }).closest('form')!)
+  expect(await screen.findByRole('alert')).toHaveTextContent(MESSAGES.csvFormat)
+  expect(screen.queryByText('private parser detail')).not.toBeInTheDocument()
+  expect(screen.getByLabelText('Reviews CSV file *')).toHaveProperty('files', [file])
+})
+
 it('keeps the authorized target context on a failed import', async () => {
   fetchMock.mockImplementation((url: string, options?: RequestInit) => Promise.resolve(json(
     options?.method === 'POST' ? { ...succeeded, state: 'failed', persisted_count: 0, message: 'Reviews could not be collected. Try again shortly.' }

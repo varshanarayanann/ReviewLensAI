@@ -348,6 +348,18 @@ The README requires PRs, successful required checks, up-to-date branches, and no
 
 Verified remote evidence: [CI run 41169689439](https://github.com/varshanarayanann/ReviewLensAI/actions/runs/41169689439) for the inspected main SHA completed successfully, including all three jobs. This is historical remote evidence, not a new local test run. During this documentation task no application suites were rerun; Node was unavailable in the shell, and no live Supabase/database/provider integration was exercised.
 
+## S1-019 handoff update (2026-11-02, branch work)
+
+The independent ingestion handoff retains the current CSV source mechanism.
+`read_csv_source` runs only after parent authorization and rejects missing or
+unusable CSV structure before an attempt is recorded. Requests accept only
+`csv_text`; required headers, 1–1,000 records, and a 1,000,000 UTF-8 byte limit
+are documented in [the CSV contract](docs/csv-import-format.md). Normalization
+failures still produce recorded failed runs, while source rejection changes no
+stored records. See [the handoff](docs/handoffs/s1-019-ingestion.md) for branch
+provenance and S1-018 integration notes. No new PR is created by this handoff,
+and primary URL/provider collection remains separate work.
+
 ## 10. Full Sprint 1 work map
 
 Board snapshot: **23 items**, all visible groups fully paginated: Backlog 10, Ready 0, In progress 4, In review 3, Done 6. Story number matches issue number in this snapshot. Read the full issue/CSV body for acceptance criteria; this table summarizes responsibility and outcome.

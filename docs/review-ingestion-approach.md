@@ -37,9 +37,10 @@ reviews; source IDs do not grant access or establish ownership.
 
 The raw mapping interface is compatible with the unmerged S1-021 normalizer's
 `review_text` / `rating` inputs and top-level optional metadata. This PR leaves
-normalization policy in the existing ingestion flow. The adapter neither repairs
+normalization policy at the next boundary. The adapter neither repairs
 invalid ratings nor invents missing review text. Optional metadata is retained by
-the adapter; the current persistence model saves text and rating only.
+the adapter; S1-021's integrated normalizer stores it in `Review.source_metadata`
+alongside canonical text/rating. See [the normalization contract](review-normalization.md).
 
 ## Source contract
 
@@ -82,8 +83,8 @@ actual SQL migrations. See the PR for the final run results.
   still fail without invoking the adapter.
 - **S1-021:** keep its normalization module/exports when resolving the shared
   `app/reviews/__init__.py` addition. Feed the adapter's raw mappings directly to
-  its normalizer. Reconcile partial-record rejection with the current all-or-nothing
-  API result contract before connecting it; no partial success is claimed here.
+  its normalizer. The S1-021 handoff connects it while preserving the current
+  all-or-nothing API result contract; no partial persistence is claimed.
 - **S1-018:** retain its create-only TargetWorkflowPage and workspace upload
   handler. The old import-page error-copy regression belongs in workspace tests
   after that screen replacement; the source API and adapter remain the same.

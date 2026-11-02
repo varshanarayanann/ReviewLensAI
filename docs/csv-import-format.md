@@ -24,8 +24,8 @@ with a JSON string field, not multipart data:
   ingestion flow requires nonblank trimmed text and whole-number ratings 1–5.
 - Other named columns, such as `source_review_id`, `reviewer_name`, `review_date`,
   and `review_url`, are retained in adapter output, including empty optional cells.
-  Current database persistence stores text/rating only; metadata storage is not
-  implemented by this change.
+  S1-021 stores these fields in the canonical Review's JSON-safe `source_metadata`
+  object; it does not use them as trusted ownership or association fields.
 
 Only `csv_text` is accepted in the request body; ownership and associations come
 from verified identity and the authorized target path. No API key is required.
@@ -41,6 +41,11 @@ Accepted source records proceed to existing normalization/persistence. A malform
 review value fails the entire recorded import; previously valid reviews remain.
 The 200 result reports actual `state`, `persisted_count`, `run_id`, `target_id`,
 and safe `message`. There is no automatic fallback to test fixtures or sample data.
+
+On the S1-021 integration branch, `normalize_reviews` produces canonical candidates
+and indexed rejections before ORM objects are built. Any rejection fails the
+recorded batch atomically; valid candidates are not silently reported as persisted.
+See [normalization policy](review-normalization.md) for rating and metadata rules.
 
 See [the ingestion approach](review-ingestion-approach.md) for adapter boundaries,
 fixture provenance, tests, and pending branch integration notes.

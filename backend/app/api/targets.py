@@ -12,6 +12,7 @@ from app.db import get_db
 from app.models import AnalysisTarget
 from app.models.ingestion import IngestionRun, Review
 from app.reviews.csv_source import ReviewSourceError, parse_csv_reviews
+from app.reviews.normalization import normalize_reviews
 from app.schemas.analysis_target import AnalysisTargetCreate
 from app.schemas.ingestion_result import IngestionResult
 
@@ -71,19 +72,21 @@ def ingest(
     db.refresh(run)
     run_id = run.id
     try:
-        rows = []
-        for row in records:
-            rating = int(row.get("rating") or "")
-            text = (row.get("review_text") or "").strip()
-            if not text or rating not in range(1, 6):
-                raise ValueError("invalid record or limit")
-            rows.append(
-                Review(
-                    target_id=target_id, run_id=run_id, review_text=text, rating=rating
-                )
+        normalized = normalize_reviews(records)
+        # Keep the public all-or-nothing import contract; never call a mixed
+        # result fully succeeded or silently discard the rejection information.
+        if normalized.rejected or not normalized.reviews:
+            raise ValueError("Invalid review records")
+        rows = [
+            Review(
+                target_id=target_id,
+                run_id=run_id,
+                review_text=review.review_text,
+                rating=review.rating,
+                source_metadata=dict(review.source_metadata),
             )
-        if not rows:
-            raise ValueError("empty input")
+            for review in normalized.reviews
+        ]
         db.add_all(rows)
         run.state = "succeeded"
         run.persisted_count = len(rows)

@@ -215,6 +215,20 @@ branch integration notes. This implements the issue's practical-import option;
 automatic collection from the saved Google Maps URL still requires a separately
 selected/configured provider integration. No provider key is needed for CSV.
 
+## Review normalization (S1-021)
+
+The ingestion handler passes raw adapter records through `normalize_reviews`
+before constructing ORM reviews. Canonical text/rating and optional JSON-safe
+source metadata are persisted together. A rejected record fails the recorded
+import atomically, preserving earlier reviews; the normalizer separately reports
+valid candidates and indexed rejection reasons without mutating input.
+
+See [the normalization contract](docs/review-normalization.md) and
+[the original author's handoff](docs/handoffs/s1-021-normalization.md). Apply the
+new ordered metadata migration through the usual migration process before
+running this code against a development database. This handoff depends on the
+S1-020 adapter in PR #39 and is not yet a merged main feature.
+
 ## Database migrations
 
 Schema changes are SQL files in `backend/migrations/`, applied in filename order.

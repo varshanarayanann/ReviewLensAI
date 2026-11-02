@@ -1,12 +1,13 @@
 """Normalize raw Google Maps review records for the application.
 
-The source contract is not finalized. This adapter currently expects
+The S1-020 supplied-export adapter provides
 ``review_text`` and ``rating`` fields; ratings are assumed to be whole-star
 values from 1 through 5, accepting numeric strings for CSV-style inputs.
-Every other input field is retained unchanged in ``source_metadata``, including
+Every other JSON-safe input field is retained in ``source_metadata``, including
 known optional fields such as ``source_review_id``, ``reviewer_name``,
-``review_date``, and ``review_url``. Confirm these names and the rating scale
-with the team when the ingestion source and canonical Review contract are set.
+``review_date``, and ``review_url``. Unknown metadata keys remain untrusted source
+data, never ownership or association inputs. The function reports invalid records
+individually; the HTTP ingestion boundary preserves its atomic batch policy.
 """
 
 from collections.abc import Iterable, Mapping
@@ -14,6 +15,7 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 from enum import StrEnum
+from math import isfinite
 
 
 class ReviewRejectionReason(StrEnum):
@@ -23,6 +25,7 @@ class ReviewRejectionReason(StrEnum):
     INVALID_REVIEW_TEXT = "invalid_review_text"
     MISSING_RATING = "missing_rating"
     INVALID_RATING = "invalid_rating"
+    INVALID_SOURCE_METADATA = "invalid_source_metadata"
 
 
 @dataclass(frozen=True)
@@ -72,7 +75,7 @@ def _normalize_record(
         return None, ReviewRejectionReason.MISSING_REVIEW_TEXT
 
     raw_text = record["review_text"]
-    if not isinstance(raw_text, str):
+    if not isinstance(raw_text, str) or "\x00" in raw_text:
         return None, ReviewRejectionReason.INVALID_REVIEW_TEXT
     review_text = raw_text.strip()
     if not review_text:
@@ -85,13 +88,17 @@ def _normalize_record(
     if rating is None:
         return None, ReviewRejectionReason.INVALID_RATING
 
-    metadata = deepcopy(
-        {
-            key: value
-            for key, value in record.items()
-            if key not in {"review_text", "rating"}
-        }
-    )
+    metadata = {
+        key: value
+        for key, value in record.items()
+        if key not in {"review_text", "rating"}
+    }
+    try:
+        if not _json_safe(metadata):
+            return None, ReviewRejectionReason.INVALID_SOURCE_METADATA
+        metadata = deepcopy(metadata)
+    except (TypeError, ValueError, RecursionError):
+        return None, ReviewRejectionReason.INVALID_SOURCE_METADATA
     return (
         NormalizedReview(
             review_text=review_text,
@@ -118,3 +125,21 @@ def _normalize_rating(value: object) -> int | None:
     ):
         return None
     return int(rating)
+
+
+def _json_safe(value: object) -> bool:
+    """Keep metadata lossless and compatible with PostgreSQL JSONB."""
+    if isinstance(value, str):
+        return "\x00" not in value
+    if value is None or isinstance(value, (bool, int)):
+        return True
+    if isinstance(value, float):
+        return isfinite(value)
+    if isinstance(value, list):
+        return all(_json_safe(item) for item in value)
+    if isinstance(value, dict):
+        return all(
+            isinstance(key, str) and _json_safe(key) and _json_safe(item)
+            for key, item in value.items()
+        )
+    return False

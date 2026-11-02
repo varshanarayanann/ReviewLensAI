@@ -148,3 +148,50 @@ def test_mixed_batch_keeps_valid_reviews_and_reports_rejections() -> None:
         ReviewRejectionReason.INVALID_RECORD,
         ReviewRejectionReason.MISSING_RATING,
     ]
+
+
+@pytest.mark.parametrize("rating", ["4.0", "4e0", 4.0, Decimal("4"), " 4 "])
+def test_integral_ratings_have_a_canonical_integer(rating):
+    result = normalize_reviews([{"review_text": "Good", "rating": rating}])
+    assert result.reviews[0].rating == 4
+    assert type(result.reviews[0].rating) is int
+
+
+@pytest.mark.parametrize(
+    "metadata",
+    [
+        {"unsupported": {1, 2}},
+        {"score": float("nan")},
+        {"nested": {1: "non-string key"}},
+        {"text": "bad\x00metadata"},
+        {"tuple": (1, 2)},
+    ],
+    ids=["set", "non-finite", "non-string-key", "nul", "tuple"],
+)
+def test_invalid_metadata_rejects_only_its_own_normalization_candidate(metadata):
+    result = normalize_reviews(
+        [
+            {"review_text": "Usable", "rating": 5},
+            {"review_text": "Other", "rating": 4, **metadata},
+        ]
+    )
+    assert [review.review_text for review in result.reviews] == ["Usable"]
+    assert result.rejected[0].index == 1
+    assert result.rejected[0].reason is ReviewRejectionReason.INVALID_SOURCE_METADATA
+
+
+def test_recursive_metadata_and_nul_text_do_not_corrupt_other_candidates():
+    cyclic = {}
+    cyclic["self"] = cyclic
+    result = normalize_reviews(
+        [
+            {"review_text": "Usable", "rating": 5},
+            {"review_text": "bad\x00text", "rating": 4},
+            {"review_text": "Other", "rating": 4, "extra": cyclic},
+        ]
+    )
+    assert [review.review_text for review in result.reviews] == ["Usable"]
+    assert [item.reason for item in result.rejected] == [
+        ReviewRejectionReason.INVALID_REVIEW_TEXT,
+        ReviewRejectionReason.INVALID_SOURCE_METADATA,
+    ]

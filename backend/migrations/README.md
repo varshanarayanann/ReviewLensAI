@@ -9,3 +9,8 @@ Version-controlled SQL migrations for the ReviewLens Postgres database (Supabase
   (Supabase Dashboard > SQL Editor, or `psql "$DATABASE_URL" -f <file>`).
 
 The first migrations (AnalysisTarget, IngestionRun, Review) are added by S1-014, S1-022, and S1-023.
+
+S1-021 adds `0003_add_review_source_metadata.sql`: a JSONB metadata object on
+reviews, defaulting existing rows to `{}`. Apply it in order before running code
+that persists normalized metadata. The disposable PostgreSQL tests exercise its
+existing-row defaults and object constraint; SQLite is not JSONB equivalence proof.

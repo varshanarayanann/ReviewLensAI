@@ -291,6 +291,17 @@ Add ordered SQL files such as `0001_create_analysis_targets.sql` to `backend/mig
 
 Do not auto-apply migrations as part of a documentation or code-inspection task. Test PostgreSQL-specific schema behavior against PostgreSQL; SQLite cannot establish equivalence for cross-schema auth FKs, server defaults, or timezone handling.
 
+## S1-021 normalization handoff update (2026-11-02, branch work)
+
+The handoff preserves Jasmine's normalizer and integrates the S1-020 adapter
+before ORM creation. Canonical JSON-safe optional metadata is stored in
+`Review.source_metadata` via new ordered migration 0003. The normalizer reports
+valid candidates/rejections separately, while the API retains atomic batch
+failure and preserves existing reviews. See [the contract](docs/review-normalization.md)
+and [handoff instructions](docs/handoffs/s1-021-normalization.md), including the
+unmerged PR #39 dependency before updating draft PR #29. No shared migration,
+main branch, original teammate branch, or PR was changed by this handoff.
+
 ## 8. Engineering conventions and UI standards
 
 Follow the existing layer boundaries. Add routes under `backend/app/api/` and register them in `create_app`; keep authentication in the shared dependency/verifier. Keep source-specific ingestion parsing separate from UI and persistence. Do not invent a service/repository framework simply because one is common elsewhere.

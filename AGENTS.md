@@ -11,6 +11,7 @@ Research snapshot: **2026-11-01**, default branch `main`, commit **`aeb68cc7c6bd
 - Repository description calls the team **JAVNB**; the board uses **JAVBN**. Preserve existing names rather than assuming one spelling is authoritative.
 - Requirements available locally: [Sprint1Issues.csv](Sprint1Issues.csv), containing all 23 Sprint 1 stories and their business-rule references.
 - Setup and delivery baseline: [README.md](README.md).
+- Engineering conventions (S1-001): [docs/context/engineering-coding-standards.md](docs/context/engineering-coding-standards.md). Read before modifying code; reviewed against `main` at `624bbf1` on 2026-11-02. The older implementation inventory below remains a dated snapshot.
 - Detailed UI specification: [docs/context/ui-ux-standards.md](docs/context/ui-ux-standards.md).
 - Database change policy: [backend/migrations/README.md](backend/migrations/README.md).
 - S1-011 ownership contract: see [README.md — Record ownership](README.md#record-ownership-s1-011). Targets persist the verified Supabase subject; reviews/runs inherit ownership through the authorized target. Creation/import bodies reject extra fields. Regression coverage is in `backend/tests/test_target_workflow.py`; the historical inventory below predates these endpoints.

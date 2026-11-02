@@ -6,6 +6,9 @@ questions grounded only in those reviews.
 
 ## Repository structure
 
+Before modifying code, read the [Engineering Coding Standards](docs/context/engineering-coding-standards.md)
+(S1-001). For screen changes, also follow the [UI/UX Standards](docs/context/ui-ux-standards.md).
+
 | Path | Responsibility |
 | --- | --- |
 | `frontend/` | React + TypeScript single-page app (Vite). UI only; talks to the backend over HTTP. |

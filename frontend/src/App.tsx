@@ -6,6 +6,7 @@ import type { AppConfig } from './lib/config'
 import DashboardPage from './pages/DashboardPage'
 import LoginPage from './pages/LoginPage'
 import NotFoundPage from './pages/NotFoundPage'
+import TargetWorkflowPage from './pages/TargetWorkflowPage'
 import RegisterPage from './pages/RegisterPage'
 
 interface AppProps {
@@ -23,6 +24,8 @@ export default function App({ config, authClient }: AppProps) {
           <Route path="/register" element={<RegisterPage />} />
         </Route>
         <Route element={<ProtectedRoute />}>
+          <Route path="/targets/new" element={<TargetWorkflowPage apiBaseUrl={config.apiBaseUrl} />} />
+          <Route path="/targets/:targetId" element={<TargetWorkflowPage apiBaseUrl={config.apiBaseUrl} />} />
           <Route path="/dashboard" element={<DashboardPage apiBaseUrl={config.apiBaseUrl} />} />
         </Route>
         <Route path="*" element={<NotFoundPage />} />

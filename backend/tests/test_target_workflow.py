@@ -8,9 +8,11 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from app.db import get_db, to_sqlalchemy_url
-from app.models import Base
+from app.models import AnalysisTarget, Base
 from app.models.ingestion import IngestionRun, Review
 from tests.conftest import USER_A_ID
+
+USER_B_ID = "22222222-2222-4222-8222-222222222222"
 
 
 @pytest.fixture(params=["sqlite", "postgres"])
@@ -68,6 +70,121 @@ def database(client, request):
                 connection.exec_driver_sql(f'DROP DATABASE IF EXISTS "{database_name}"')
             admin.dispose()
         Base.metadata.remove(users)
+
+
+def test_created_records_belong_to_verified_subject(client, make_token, database):
+    with database.begin() as connection:
+        connection.execute(
+            Base.metadata.tables["auth.users"].insert().values(id=UUID(USER_B_ID))
+        )
+
+    targets = {}
+    for subject, spoofed in ((USER_A_ID, USER_B_ID), (USER_B_ID, USER_A_ID)):
+        headers = {
+            "Authorization": f"Bearer {make_token(sub=subject)}",
+            "X-User-Id": spoofed,
+            "X-Owner-Id": spoofed,
+        }
+        response = client.post(
+            "/api/targets",
+            params={"userId": spoofed, "owner_id": spoofed},
+            headers=headers,
+            json={"name": "Same name", "source_url": "https://google.com/maps/place/X"},
+        )
+        assert response.status_code == 201
+        target_id = UUID(response.json()["id"])
+        targets[subject] = target_id
+        imported = client.post(
+            f"/api/targets/{target_id}/ingestions",
+            headers=headers,
+            json={"csv_text": "rating,review_text\n5,Great"},
+        )
+        assert imported.status_code == 200
+        assert imported.json()["state"] == "succeeded"
+
+    # Read through a fresh session to prove ownership and associations persisted.
+    with Session(database) as db:
+        assert len(db.scalars(select(AnalysisTarget)).all()) == 2
+        for subject, target_id in targets.items():
+            assert db.get(AnalysisTarget, target_id).owner_id == UUID(subject)
+            run = db.scalar(
+                select(IngestionRun).where(IngestionRun.target_id == target_id)
+            )
+            review = db.scalar(select(Review).where(Review.target_id == target_id))
+            assert run is not None and review is not None
+            assert review.run_id == run.id
+            assert review.target_id == run.target_id == target_id
+
+    for subject, other in ((USER_A_ID, USER_B_ID), (USER_B_ID, USER_A_ID)):
+        headers = {"Authorization": f"Bearer {make_token(sub=subject)}"}
+        path = f"/api/targets/{targets[other]}"
+        assert client.get(path, headers=headers).status_code == 404
+        assert (
+            client.post(
+                path + "/ingestions",
+                headers=headers,
+                json={"csv_text": "rating,review_text\n5,Denied"},
+            ).status_code
+            == 404
+        )
+    with Session(database) as db:
+        assert len(db.scalars(select(IngestionRun)).all()) == 2
+        assert len(db.scalars(select(Review)).all()) == 2
+
+
+@pytest.mark.parametrize("token", [None, "invalid-token"])
+def test_unverified_identity_cannot_create_records(client, database, token):
+    headers = {"X-User-Id": USER_A_ID}
+    if token is not None:
+        headers["Authorization"] = f"Bearer {token}"
+    response = client.post(
+        "/api/targets",
+        headers=headers,
+        json={"name": "Denied", "source_url": "https://google.com/maps/place/X"},
+    )
+    assert response.status_code == 401
+    with Session(database) as db:
+        assert not db.scalars(select(AnalysisTarget)).all()
+
+
+@pytest.mark.parametrize("field", ["owner_id", "ownerId", "user_id", "userId"])
+def test_client_ownership_fields_cannot_create_target(
+    client, make_token, database, field
+):
+    response = client.post(
+        "/api/targets",
+        headers={"Authorization": f"Bearer {make_token()}"},
+        json={
+            "name": "Spoofed",
+            "source_url": "https://google.com/maps/place/X",
+            field: USER_B_ID,
+        },
+    )
+    assert response.status_code == 422
+    with Session(database) as db:
+        assert not db.scalars(select(AnalysisTarget)).all()
+
+
+@pytest.mark.parametrize("field", ["owner_id", "userId", "target_id", "run_id"])
+def test_import_rejects_client_ownership_and_association_fields(
+    client, make_token, database, field
+):
+    headers = {"Authorization": f"Bearer {make_token()}"}
+    target_id = client.post(
+        "/api/targets",
+        headers=headers,
+        json={"name": "Owned", "source_url": "https://google.com/maps/place/X"},
+    ).json()["id"]
+    response = client.post(
+        f"/api/targets/{target_id}/ingestions",
+        headers=headers,
+        json={"csv_text": "rating,review_text\n5,Great", field: USER_B_ID},
+    )
+    assert response.status_code == 422
+    with Session(database) as db:
+        assert db.get(AnalysisTarget, UUID(target_id)).owner_id == UUID(USER_A_ID)
+        assert not db.scalars(select(IngestionRun)).all()
+        assert not db.scalars(select(Review)).all()
 
 
 def test_validation_ingestion_and_failure_preserves_reviews(

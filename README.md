@@ -203,5 +203,25 @@ the Supabase service-role key and database password must never appear in the fro
 
 ## Database migrations
 
+### Record ownership (S1-011)
+
+`AnalysisTarget.owner_id` stores the verified Supabase user's JWT subject as a
+UUID, referencing `auth.users.id`. `POST /api/targets` derives it from
+`Depends(get_current_user)`; clients supply only the editable target fields.
+Ownership fields such as `owner_id` or `userId` in the JSON body are rejected with
+422. Query parameters and identity headers cannot override the verified subject.
+
+Reviews and ingestion runs inherit ownership through their persisted target.
+The backend checks target ID and owner before creating either child record;
+another user's target returns 404 and creates no records. CSV requests accept
+only `csv_text`, rejecting client-supplied ownership or association fields.
+No separate application User table or duplicated child owner field is required.
+
+Regression tests in `backend/tests/test_target_workflow.py` check persisted owners
+for two signed identities, spoofed inputs, unauthenticated creation, and child
+associations against SQLite and, when `TEST_POSTGRES_URL` is configured, PostgreSQL.
+
+### Applying schema changes
+
 Schema changes are SQL files in `backend/migrations/`, applied in filename order.
 See `backend/migrations/README.md`.

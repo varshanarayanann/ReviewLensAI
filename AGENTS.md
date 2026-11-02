@@ -13,6 +13,7 @@ Research snapshot: **2026-11-01**, default branch `main`, commit **`aeb68cc7c6bd
 - Setup and delivery baseline: [README.md](README.md).
 - Detailed UI specification: [docs/context/ui-ux-standards.md](docs/context/ui-ux-standards.md).
 - Database change policy: [backend/migrations/README.md](backend/migrations/README.md).
+- S1-011 ownership contract: see [README.md — Record ownership](README.md#record-ownership-s1-011). Targets persist the verified Supabase subject; reviews/runs inherit ownership through the authorized target. Creation/import bodies reject extra fields. Regression coverage is in `backend/tests/test_target_workflow.py`; the historical inventory below predates these endpoints.
 
 **Evidence labels in this guide:** implemented means present in the inspected `main`; planned means required by stories or team documentation; branch-only means inspected but unmerged. A closed issue or a Done board card does not prove its files exist on `main`.
 

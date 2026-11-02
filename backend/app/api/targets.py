@@ -47,7 +47,7 @@ def create_target(
 class CsvImport(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    csv_text: str = Field(strict=True, min_length=1, max_length=1_000_000)
+    csv_text: str = Field(min_length=1, max_length=1_000_000)
 
 
 def read_csv_source(csv_text: str) -> list[dict[str, str | None]]:
@@ -88,9 +88,10 @@ def ingest(
     user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    owned(target_id, user, db)
+    # Child records inherit ownership from this authorized, persisted target.
+    target = owned(target_id, user, db)
     records = read_csv_source(body.csv_text)
-    run = IngestionRun(target_id=target_id)
+    run = IngestionRun(target_id=target.id)
     db.add(run)
     db.commit()
     db.refresh(run)
@@ -104,7 +105,7 @@ def ingest(
                 raise ValueError("invalid record or limit")
             rows.append(
                 Review(
-                    target_id=target_id, run_id=run_id, review_text=text, rating=rating
+                    target_id=target.id, run_id=run_id, review_text=text, rating=rating
                 )
             )
         if not rows:

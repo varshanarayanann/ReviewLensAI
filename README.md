@@ -117,6 +117,31 @@ Quick checks:
 If port 8000 is already in use, start the backend with another port (for example
 `--port 8001`) and set `VITE_API_BASE_URL=http://localhost:8001` in `frontend/.env`.
 
+## Review and ingestion authorization (S1-013)
+
+Review ownership is inherited through `AnalysisTarget.owner_id`. Every implemented
+child operation authenticates the caller and checks the parent target by both ID
+and verified owner before accessing review data or starting ingestion:
+
+| Operation | Contract |
+| --- | --- |
+| `GET /api/targets/{target_id}/reviews` | Returns only that owned target's persisted reviews as a JSON array. Each record contains `id`, `target_id`, `run_id`, `review_text`, and `rating`. |
+| `POST /api/targets/{target_id}/ingestions` | Creates reviews through CSV ingestion only after parent authorization. |
+| `GET /api/targets/{target_id}/ingestions/latest` | Returns only the authorized target's latest ingestion result. |
+
+Review listing uses UUID order for deterministic paging: `limit` defaults to 50
+(1–100 allowed), and `offset` defaults to 0 (nonnegative). An owned target with no
+reviews returns `[]`. Missing and inaccessible targets both return
+`404 {"detail":"Analysis target not found."}`; missing/invalid authentication
+returns 401. Identity/target query parameters do not override the authenticated
+user or path target. Direct review creation, editing, and deletion endpoints are
+not exposed; ingestion is the only implemented review-write operation.
+
+Two-user regression tests in `backend/tests/test_target_workflow.py` verify reads,
+ingestion denial before CSV processing, unchanged stored targets/reviews/runs
+after denial, unavailable direct writes, and authentication requirements. They
+run against SQLite and PostgreSQL using the existing disposable-database fixture.
+
 ## Quality checks
 
 Run these before opening a pull request.
@@ -136,6 +161,26 @@ npm run lint
 npm test
 npm run build
 ```
+
+## My analysis targets (S1-017)
+
+The protected Dashboard loads `GET /api/targets` with the current bearer token.
+The backend applies `AnalysisTarget.owner_id == CurrentUser.id` in its SQL query;
+it never sends all users' targets to the browser for filtering. Identity headers
+or query parameters cannot override the verified owner. Missing/invalid tokens
+return 401, while an authenticated user with no targets receives `[]`.
+
+The response is a JSON array containing `id`, `name`, `platform`, `source_url`,
+and `created_at`, ordered newest first (UUID descending breaks timestamp ties).
+It contains all of the current user's targets, without a hidden page limit.
+Cards show the name, Google Maps platform, source reference, and created date;
+selecting a card opens `/targets/:targetId`. Loading, empty, safe error/retry,
+and expired-session states are implemented. Changing accounts or API configuration
+remounts the list, and late responses from the previous account are ignored.
+
+The list does not add target deletion, ingestion statistics, or workspace redesign.
+Tests cover two-user persisted isolation on SQLite/PostgreSQL and dashboard
+navigation, failures, and session changes using deterministic fixtures.
 
 ## Continuous integration
 
@@ -205,6 +250,26 @@ Every `VITE_*` value is visible in the browser. Only public values belong here;
 the Supabase service-role key and database password must never appear in the frontend.
 
 ## Database migrations
+
+### Record ownership (S1-011)
+
+`AnalysisTarget.owner_id` stores the verified Supabase user's JWT subject as a
+UUID, referencing `auth.users.id`. `POST /api/targets` derives it from
+`Depends(get_current_user)`; clients supply only the editable target fields.
+Ownership fields such as `owner_id` or `userId` in the JSON body are rejected with
+422. Query parameters and identity headers cannot override the verified subject.
+
+Reviews and ingestion runs inherit ownership through their persisted target.
+The backend checks target ID and owner before creating either child record;
+another user's target returns 404 and creates no records. CSV requests accept
+only `csv_text`, rejecting client-supplied ownership or association fields.
+No separate application User table or duplicated child owner field is required.
+
+Regression tests in `backend/tests/test_target_workflow.py` check persisted owners
+for two signed identities, spoofed inputs, unauthenticated creation, and child
+associations against SQLite and, when `TEST_POSTGRES_URL` is configured, PostgreSQL.
+
+### Applying schema changes
 
 Schema changes are SQL files in `backend/migrations/`, applied in filename order.
 See `backend/migrations/README.md`.

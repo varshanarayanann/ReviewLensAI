@@ -1,8 +1,11 @@
 # ReviewLens AI — Engineering Coding Standards
 
-**Story:** S1-001 — Create Engineering Coding Standards Context Document  
-**Rule references:** S1-BR-004, S1-BR-007, S1-BR-011  
-**Audience:** Team developers, reviewers, and AI coding tools modifying this repository.  
+**Story:** S1-001 — Create Engineering Coding Standards Context Document
+
+**Rule references:** S1-BR-004, S1-BR-007, S1-BR-011
+
+**Audience:** Team developers, reviewers, and AI coding tools modifying this repository.
+
 **Baseline reviewed:** 2026-11-02, `main` at `624bbf1`.
 
 ## 1. Using this context

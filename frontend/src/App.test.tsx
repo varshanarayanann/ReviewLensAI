@@ -32,7 +32,7 @@ function fillIn(label: RegExp, value: string) {
 let fetchMock: ReturnType<typeof vi.fn>
 
 beforeEach(() => {
-  fetchMock = vi.fn().mockResolvedValue(jsonResponse({ id: 'user-a-id', email: 'user.a@example.com' }))
+  fetchMock = vi.fn().mockResolvedValue(jsonResponse([]))
   vi.stubGlobal('fetch', fetchMock)
 })
 
@@ -95,8 +95,8 @@ describe('log in', () => {
       email: 'user.a@example.com',
       password: 'correct-password',
     })
-    expect(await screen.findByText('Logged in as user.a@example.com')).toBeInTheDocument()
-    expect(fetchMock).toHaveBeenCalledWith('http://api.test/api/me', {
+    expect(await screen.findByText(MESSAGES.noTargets)).toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledWith('http://api.test/api/targets', {
       headers: { Authorization: 'Bearer test-access-token' },
     })
   })

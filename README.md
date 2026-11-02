@@ -134,6 +134,26 @@ npm test
 npm run build
 ```
 
+## My analysis targets (S1-017)
+
+The protected Dashboard loads `GET /api/targets` with the current bearer token.
+The backend applies `AnalysisTarget.owner_id == CurrentUser.id` in its SQL query;
+it never sends all users' targets to the browser for filtering. Identity headers
+or query parameters cannot override the verified owner. Missing/invalid tokens
+return 401, while an authenticated user with no targets receives `[]`.
+
+The response is a JSON array containing `id`, `name`, `platform`, `source_url`,
+and `created_at`, ordered newest first (UUID descending breaks timestamp ties).
+It contains all of the current user's targets, without a hidden page limit.
+Cards show the name, Google Maps platform, source reference, and created date;
+selecting a card opens `/targets/:targetId`. Loading, empty, safe error/retry,
+and expired-session states are implemented. Changing accounts or API configuration
+remounts the list, and late responses from the previous account are ignored.
+
+The list does not add target deletion, ingestion statistics, or workspace redesign.
+Tests cover two-user persisted isolation on SQLite/PostgreSQL and dashboard
+navigation, failures, and session changes using deterministic fixtures.
+
 ## Continuous integration
 
 `.github/workflows/ci.yml` runs automatically on every pull request, on every push

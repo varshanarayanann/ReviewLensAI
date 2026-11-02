@@ -439,6 +439,19 @@ CSV ingestion runs/reviews, latest-result retrieval, and protected browser forms
 Primary URL ingestion and real PostgreSQL migration verification remain pending.
 
 
+### S1-017 target-list update (2026-11-02, branch work)
+
+`GET /api/targets` returns only the verified user's persisted targets, filtered
+by owner in SQL and ordered by `created_at DESC, id DESC`. Response fields are
+`id`, `name`, `platform`, `source_url`, and `created_at`. The Dashboard uses typed
+API calls and shared target cards with loading/empty/error/retry states; account
+changes clear old list state and stale responses are ignored. See
+[README — My analysis targets](README.md#my-analysis-targets-s1-017).
+Backend isolation tests live in `backend/tests/test_target_listing.py` and reuse
+the SQLite/PostgreSQL fixture; dashboard tests are colocated with the page.
+This branch supersedes the historical inventory's placeholder-dashboard and
+missing-list-endpoint descriptions without implying it is already merged.
+
 ### S1-023 verification update (2026-11-02)
 
 PR #28 is merged. Actual SQL migrations and ingestion outcome transactions now

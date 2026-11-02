@@ -3,7 +3,8 @@ import io
 import logging
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+import fastapi
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -35,8 +36,8 @@ def owned(target_id: UUID, user: CurrentUser, db: Session) -> AnalysisTarget:
 @router.get("/{target_id}/reviews", response_model=list[ReviewResponse])
 def list_reviews(
     target_id: UUID,
-    limit: int = Query(default=50, ge=1, le=100),
-    offset: int = Query(default=0, ge=0),
+    limit: int = fastapi.Query(default=50, ge=1, le=100),
+    offset: int = fastapi.Query(default=0, ge=0),
     user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):

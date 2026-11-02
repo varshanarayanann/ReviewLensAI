@@ -6,6 +6,9 @@ questions grounded only in those reviews.
 
 ## Repository structure
 
+Before modifying code, read the [Engineering Coding Standards](docs/context/engineering-coding-standards.md)
+(S1-001). For screen changes, also follow the [UI/UX Standards](docs/context/ui-ux-standards.md).
+
 | Path | Responsibility |
 | --- | --- |
 | `frontend/` | React + TypeScript single-page app (Vite). UI only; talks to the backend over HTTP. |
@@ -114,6 +117,31 @@ Quick checks:
 If port 8000 is already in use, start the backend with another port (for example
 `--port 8001`) and set `VITE_API_BASE_URL=http://localhost:8001` in `frontend/.env`.
 
+## Review and ingestion authorization (S1-013)
+
+Review ownership is inherited through `AnalysisTarget.owner_id`. Every implemented
+child operation authenticates the caller and checks the parent target by both ID
+and verified owner before accessing review data or starting ingestion:
+
+| Operation | Contract |
+| --- | --- |
+| `GET /api/targets/{target_id}/reviews` | Returns only that owned target's persisted reviews as a JSON array. Each record contains `id`, `target_id`, `run_id`, `review_text`, and `rating`. |
+| `POST /api/targets/{target_id}/ingestions` | Creates reviews through CSV ingestion only after parent authorization. |
+| `GET /api/targets/{target_id}/ingestions/latest` | Returns only the authorized target's latest ingestion result. |
+
+Review listing uses UUID order for deterministic paging: `limit` defaults to 50
+(1–100 allowed), and `offset` defaults to 0 (nonnegative). An owned target with no
+reviews returns `[]`. Missing and inaccessible targets both return
+`404 {"detail":"Analysis target not found."}`; missing/invalid authentication
+returns 401. Identity/target query parameters do not override the authenticated
+user or path target. Direct review creation, editing, and deletion endpoints are
+not exposed; ingestion is the only implemented review-write operation.
+
+Two-user regression tests in `backend/tests/test_target_workflow.py` verify reads,
+ingestion denial before CSV processing, unchanged stored targets/reviews/runs
+after denial, unavailable direct writes, and authentication requirements. They
+run against SQLite and PostgreSQL using the existing disposable-database fixture.
+
 ## Quality checks
 
 Run these before opening a pull request.
@@ -133,6 +161,26 @@ npm run lint
 npm test
 npm run build
 ```
+
+## My analysis targets (S1-017)
+
+The protected Dashboard loads `GET /api/targets` with the current bearer token.
+The backend applies `AnalysisTarget.owner_id == CurrentUser.id` in its SQL query;
+it never sends all users' targets to the browser for filtering. Identity headers
+or query parameters cannot override the verified owner. Missing/invalid tokens
+return 401, while an authenticated user with no targets receives `[]`.
+
+The response is a JSON array containing `id`, `name`, `platform`, `source_url`,
+and `created_at`, ordered newest first (UUID descending breaks timestamp ties).
+It contains all of the current user's targets, without a hidden page limit.
+Cards show the name, Google Maps platform, source reference, and created date;
+selecting a card opens `/targets/:targetId`. Loading, empty, safe error/retry,
+and expired-session states are implemented. Changing accounts or API configuration
+remounts the list, and late responses from the previous account are ignored.
+
+The list does not add target deletion, ingestion statistics, or workspace redesign.
+Tests cover two-user persisted isolation on SQLite/PostgreSQL and dashboard
+navigation, failures, and session changes using deterministic fixtures.
 
 ## Continuous integration
 
@@ -210,12 +258,63 @@ HTTP routes, and persistence; it preserves optional metadata for normalization.
 Source rejection never inserts sample reviews or substitutes test fixtures.
 
 See [the selected ingestion approach](docs/review-ingestion-approach.md) and
-[CSV format](docs/csv-import-format.md) for limits, fixture provenance, and pending
-branch integration notes. This implements the issue's practical-import option;
+[CSV format](docs/csv-import-format.md) for limits, fixture provenance, and normalization
+integration notes. This implements the issue's practical-import option;
 automatic collection from the saved Google Maps URL still requires a separately
 selected/configured provider integration. No provider key is needed for CSV.
 
+## Ingestion source submission (S1-019)
+
+The existing CSV import path submits JSON `csv_text` to
+`POST /api/targets/{target_id}/ingestions` with the current bearer token. The
+backend verifies target ownership before parsing, then checks required CSV
+structure and limits before creating an attempt. Rejected sources return 422
+without altering reviews or the previous latest result. Missing/cross-user
+targets share the same 404 response and start no processing.
+
+See [the CSV source contract](docs/csv-import-format.md) for exact columns, limits,
+and outcome semantics, and [the S1-019 handoff](docs/handoffs/s1-019-ingestion.md)
+for the original issue author's branch/PR instructions. Primary URL/provider
+collection remains separate work; no provider credentials are needed for CSV.
+
 ## Database migrations
+
+### Record ownership (S1-011)
+
+`AnalysisTarget.owner_id` stores the verified Supabase user's JWT subject as a
+UUID, referencing `auth.users.id`. `POST /api/targets` derives it from
+`Depends(get_current_user)`; clients supply only the editable target fields.
+Ownership fields such as `owner_id` or `userId` in the JSON body are rejected with
+422. Query parameters and identity headers cannot override the verified subject.
+
+Reviews and ingestion runs inherit ownership through their persisted target.
+The backend checks target ID and owner before creating either child record;
+another user's target returns 404 and creates no records. CSV requests accept
+only `csv_text`, rejecting client-supplied ownership or association fields.
+No separate application User table or duplicated child owner field is required.
+
+Regression tests in `backend/tests/test_target_workflow.py` check persisted owners
+for two signed identities, spoofed inputs, unauthenticated creation, and child
+associations against SQLite and, when `TEST_POSTGRES_URL` is configured, PostgreSQL.
+
+### Applying schema changes
 
 Schema changes are SQL files in `backend/migrations/`, applied in filename order.
 See `backend/migrations/README.md`.
+
+## Analysis workspace (S1-018)
+
+`/targets/:targetId` loads the authorized target and its latest recorded ingestion
+result through FastAPI. The workspace displays the target name, Google Maps
+platform, saved source URL, and current basic ingestion status. The protected
+`GET /api/targets/{targetId}` response includes `id`, `name`, `platform`, and
+`source_url`; inaccessible and missing targets both return 404.
+
+Use **Upload a CSV** for the implemented ingestion path, then **Refresh workspace**
+to reload the persisted result. CSV import uses the existing API and limits;
+collection directly from the saved Google Maps URL remains provider-integration
+work. Dashboard card selection is delivered separately by S1-017; direct links
+and navigation after target creation work without it.
+
+The original S1-018 author can integrate the completed feature and update her
+existing draft PR using [the handoff instructions](docs/handoffs/s1-018-workspace.md).

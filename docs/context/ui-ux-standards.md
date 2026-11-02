@@ -306,7 +306,7 @@ The UI must distinguish these categories (technical spec Section 5.1). Never col
 | Ingestion: review provider unavailable | Ingestion run `failed` | Danger `Alert` in Ingestion panel | `We can't reach the review source right now. Try again later, or upload a CSV instead.` |
 | Ingestion: quota exhausted | Ingestion run `failed` | Warning `Alert` in Ingestion panel | `ReviewLens has reached its review-collection limit for now. Try again later, or upload a CSV instead.` |
 | CSV: wrong file type / too large / empty | `400` / `422` | Inline error under the file field | See Section 5.6 |
-| CSV: missing required columns | `422` | Danger `Alert` in Ingestion panel | `This CSV is missing required columns. It needs a "rating" column and a "review_text" column.` (column names pending S1-020 / S1-021) |
+| CSV: missing required columns | `422` | Danger `Alert` in Ingestion panel | `This CSV is missing required columns. It needs a "rating" column and a "review_text" column.` (see the S1-019 CSV contract) |
 | CSV: no valid rows | Ingestion run `failed` | Danger `Alert` in Ingestion panel | `None of the rows in this file had both a rating and review text, so nothing was imported.` |
 | Network failure (offline) | Request never completes | Toast; keep current data on screen | `You appear to be offline. Check your connection and try again.` |
 | Unexpected application failure | `500` | Danger `Alert` at page or panel level | `Something went wrong on our side. Try again, and contact the team if it keeps happening.` |
@@ -345,7 +345,7 @@ Supabase errors are mapped; **never render the Supabase message string**:
 - Uses the `FileUploadField` component: label `Reviews CSV file`, a drop zone plus a `Choose file` button, `accept=".csv"`.
 - Helper text lists the expected format: `CSV with columns: rating (1-5), review_text. Optional: reviewer_name, review_date, review_url.` The exact column names must match the backend parser and the team's documented CSV format.
 
-> **Pending (S1-020 / S1-021):** CSV column names and max file size / row limit are finalized when the backend parser is built. The authoritative format will live in `docs/csv-import-format.md`; update the helper text above and the messages below to match it.
+> **S1-019 CSV contract:** See [CSV import format](../csv-import-format.md). Required columns are `rating` and `review_text`; the source is limited to 1,000,000 UTF-8 bytes and 1–1,000 records. Other named columns are accepted but are not currently persisted. Source-format rejection returns 422 before an attempt is recorded; invalid review values after source acceptance produce a recorded failed ingestion. Optional metadata persistence remains separate integration work.
 - After choosing a file, show the file name and size with a `Remove` ghost button before upload.
 - Client-side checks (backend re-validates):
 

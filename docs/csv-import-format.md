@@ -1,46 +1,72 @@
-# CSV review import format
+# CSV review source contract
 
-S1-020 imports user-supplied Google Maps business-review exports through the
-existing recovery path. It does not collect data from the saved URL.
+S1-019 uses the CSV recovery mechanism already implemented on main. It is a
+practical import path for Google Maps review data, not automatic collection from
+the saved target URL. Primary URL/provider integration remains separate work.
 
-## Request and records
+## Request
 
-Use the existing authenticated `POST /api/targets/{target_id}/ingestions` endpoint
-with a JSON string field, not multipart data:
+Send an authenticated `POST /api/targets/{target_id}/ingestions` request with JSON:
 
 ```json
-{"csv_text":"rating,review_text\n5,Text from the submitted export"}
+{"csv_text":"rating,review_text\n5,Helpful staff"}
 ```
 
-- Required column names: exactly `rating` and `review_text`, in either order.
-- Provide a header and 1–1,000 CSV records. Quoted commas, quotes, and embedded
-  newlines are supported. Blank lines are ignored; a leading UTF-8 BOM is accepted.
-- Duplicate/blank column names, extra unnamed row values, malformed CSV, or an
-  empty/header-only source are rejected rather than silently repaired or truncated.
-- Maximum UTF-8 source size: 1,000,000 bytes; the request string also has a
-  1,000,000-character limit. The standard Python CSV reader's per-field size limit
-  also applies. Files/fields exceeding parser limits get the same safe source error.
-- Raw text and rating strings are preserved for normalization. The current
-  ingestion flow requires nonblank trimmed text and whole-number ratings 1–5.
-- Other named columns, such as `source_review_id`, `reviewer_name`, `review_date`,
-  and `review_url`, are retained in adapter output, including empty optional cells.
-  Current database persistence stores text/rating only; metadata storage is not
-  implemented by this change.
+The target must already exist and belong to the verified caller. The backend
+uses the UUID path parameter and authenticated identity; it accepts no owner,
+user, target, run, provider, or source-URL override fields in the body. The browser
+uploads a `.csv` file by reading its text and sending this JSON, not multipart data.
 
-Only `csv_text` is accepted in the request body; ownership and associations come
-from verified identity and the authorized target path. No API key is required.
+## Source requirements
 
-## Outcomes
+- Provide a nonempty string containing a CSV header and **1–1,000 data records**.
+- Required column names are exactly **`rating`** and **`review_text`**. Header
+  order may vary; duplicate column names and rows with extra unnamed values are
+  rejected. Other named columns are accepted but their metadata is not currently
+  persisted by this importer.
+- Maximum source size is **1,000,000 UTF-8 bytes**, including any BOM. The JSON
+  string also has a 1,000,000-character request limit. JSON overhead is not part
+  of the source-byte limit. Normal CSV quoting/parser validity rules apply.
+- A leading UTF-8 BOM is accepted. Whitespace-only content, BOM-only content,
+  header-only files, missing required headers, malformed quoting, and excessive
+  row/byte counts are rejected before an attempt is recorded.
+- Within a structurally accepted source, each review needs nonblank text and an
+  integer rating 1–5. Existing normalization trims surrounding review-text
+  whitespace. Invalid review values reject the entire recorded ingestion; partial
+  ingestion is not implemented. Previously persisted reviews remain intact.
 
-Parent authorization happens before source parsing. Missing/invalid authentication
-returns 401; missing and inaccessible targets share the same 404. Invalid source
-structure returns 422 before creating a run, leaving the prior latest result and
-reviews intact. The UI shows safe CSV-specific guidance and retains the selection.
+The saved Google Maps URL identifies the target's source context. This CSV path
+does not fetch it or require provider credentials. Supplying `source_url` instead
+of `csv_text` does not initiate URL ingestion.
 
-Accepted source records proceed to existing normalization/persistence. A malformed
-review value fails the entire recorded import; previously valid reviews remain.
-The 200 result reports actual `state`, `persisted_count`, `run_id`, `target_id`,
-and safe `message`. There is no automatic fallback to test fixtures or sample data.
+## Authorization, validation, and results
+
+Authentication and the request schema are validated by FastAPI. The handler checks
+the target's existence and verified ownership **before calling the CSV parser**.
+Only an owned target with an accepted CSV source gets an `IngestionRun`; the
+existing normalization/persistence flow then records the real outcome.
+
+| Result | Behavior |
+| --- | --- |
+| Missing/invalid authentication | 401; no source processing or new records |
+| Authentication infrastructure unavailable | 503; no source processing |
+| Missing or another user's target | Same safe 404 response; no CSV parsing or mutations |
+| Missing/wrong request fields or unusable source | 422; no new attempt/reviews and latest recorded result unchanged |
+| Accepted source | 200 with recorded `run_id`, `target_id`, `state`, `persisted_count`, and safe `message` |
+
+After acceptance, a normalization/persistence failure returns a recorded `failed`
+outcome with zero new reviews. HTTP 200 does not itself imply ingestion succeeded.
+`GET /api/targets/{target_id}/ingestions/latest` restores the latest recorded result.
+Client errors must use safe import guidance, never raw parser/database messages.
+
+## Source adapter
+
+`app.reviews.csv_source.parse_csv_reviews` reads the supplied source independently
+of the UI and database. It preserves raw text/rating and optional named metadata
+for normalization; current persistence stores text/rating only. Blank column names
+are rejected. Quoted commas, quotes, embedded newlines, and Unicode are supported.
+Python CSV per-field limits also apply and produce the same safe source error.
+Application code never substitutes fixture or sample reviews.
 
 See [the ingestion approach](review-ingestion-approach.md) for adapter boundaries,
-fixture provenance, tests, and pending branch integration notes.
+fixture provenance, tests, and normalization integration notes.

@@ -71,22 +71,16 @@ source errors, no fallback insertion, and preservation of previous reviews/resul
 SQLite and disposable PostgreSQL tests apply the repository's normal fixtures and
 actual SQL migrations. See the PR for the final run results.
 
-## Combining pending branches
+## Integration with the current workflow
 
-- **S1-019 handoff:** replace the inline CSV parsing/preflight implementation with
-  this adapter, retaining validation after ownership and before recording work.
-  Keep its strict request fields, persisted-target associations, and submission
-  tests. Do not keep two independent parsers or silently change error timing.
-- **S1-013 / S1-019 tests:** spies on `app.api.targets.csv.DictReader` need to target
-  `app.api.targets.parse_csv_reviews` after this refactor. Denied requests must
-  still fail without invoking the adapter.
-- **S1-021:** keep its normalization module/exports when resolving the shared
-  `app/reviews/__init__.py` addition. Feed the adapter's raw mappings directly to
-  its normalizer. Reconcile partial-record rejection with the current all-or-nothing
-  API result contract before connecting it; no partial success is claimed here.
-- **S1-018:** retain its create-only TargetWorkflowPage and workspace upload
-  handler. The old import-page error-copy regression belongs in workspace tests
-  after that screen replacement; the source API and adapter remain the same.
+S1-019 submission and S1-018 workspace behavior are retained. The source adapter
+replaces the inline preflight, after target authorization and before recording an
+attempt. Request fields, persisted-target associations, and submission tests remain
+strict. Authorization spies target `app.api.targets.parse_csv_reviews` and prove
+denied requests never invoke it. Workspace tests verify safe CSV guidance and
+retention of the selected file after rejection.
 
-No main-branch merge, repository setting change, provider purchase, or live
-credential operation is part of this implementation.
+S1-021 remains a separate PR. Keep its normalization module/exports when resolving
+the shared `app/reviews/__init__.py` addition, and feed the adapter's raw mappings
+to its normalizer. Reconcile partial-record rejection with the current all-or-nothing
+API result contract before connecting it; no partial success is claimed here.

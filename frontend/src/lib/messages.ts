@@ -1,4 +1,12 @@
 export const MESSAGES = {
+  targetNotFound: "We couldn't find that analysis target. It may have been deleted, or you may not have access to it.",
+  csvFile: 'Choose a CSV file smaller than 1 MB.',
+  csvFormat: 'Check that your CSV has rating and review_text columns and is smaller than 1 MB.',
+  csvRecovery: 'Upload reviews from a CSV with rating and review_text columns. Ratings must be integers from 1 to 5. Maximum 1,000 reviews. Invalid rows reject the entire import; existing reviews are retained.',
+  ingestionUnavailable: 'Collection from the saved Google Maps URL is not available yet. You can upload a CSV instead.',
+  ingestionBusy: 'Ingestion is already running. Refresh the workspace to check its result.',
+  noTargets: 'No analysis targets yet',
+  addTarget: 'Add a Google Maps business to start analyzing its reviews.',
   formSummary: 'Please fix the highlighted fields.',
   emailRequired: 'Enter your email address.',
   emailInvalid: 'Enter a valid email address, like name@example.com.',
@@ -13,5 +21,4 @@ export const MESSAGES = {
   sessionEnded: 'Your session has ended. Please log in again.',
   offline: 'You appear to be offline. Check your connection and try again.',
   unexpected: 'Something went wrong on our side. Try again, and contact the team if it keeps happening.',
-  csvSourceInvalid: 'Choose a CSV with rating and review_text columns, 1–1,000 reviews, and a file size of 1 MB or less.',
 } as const

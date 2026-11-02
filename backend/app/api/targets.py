@@ -1,6 +1,7 @@
 import logging
 from uuid import UUID, uuid4
 
+import fastapi
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
@@ -12,14 +13,16 @@ from app.db import get_db
 from app.models import AnalysisTarget
 from app.models.ingestion import IngestionRun, Review
 from app.reviews.csv_source import ReviewSourceError, parse_csv_reviews
-from app.schemas.analysis_target import AnalysisTargetCreate
+from app.schemas import target_list
+from app.schemas.analysis_target import AnalysisTargetCreate, AnalysisTargetRead
 from app.schemas.ingestion_result import IngestionResult
+from app.schemas.review import ReviewResponse
 
 router = APIRouter(prefix="/api/targets", dependencies=[Depends(get_current_user)])
 logger = logging.getLogger(__name__)
 
 
-def owned(target_id: UUID, user: CurrentUser, db: Session):
+def owned(target_id: UUID, user: CurrentUser, db: Session) -> AnalysisTarget:
     target = db.scalar(
         select(AnalysisTarget).where(
             AnalysisTarget.id == target_id, AnalysisTarget.owner_id == UUID(user.id)
@@ -30,13 +33,38 @@ def owned(target_id: UUID, user: CurrentUser, db: Session):
     return target
 
 
+@router.get("/{target_id}/reviews", response_model=list[ReviewResponse])
+def list_reviews(
+    target_id: UUID,
+    limit: int = fastapi.Query(default=50, ge=1, le=100),
+    offset: int = fastapi.Query(default=0, ge=0),
+    user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    target = owned(target_id, user, db)
+    return db.scalars(
+        select(Review)
+        .where(Review.target_id == target.id)
+        .order_by(Review.id)
+        .limit(limit)
+        .offset(offset)
+    ).all()
+
+
 @router.post("", status_code=201)
 def create_target(
     body: AnalysisTargetCreate,
     user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    target = AnalysisTarget(id=uuid4(), owner_id=UUID(user.id), **body.model_dump())
+    # Ownership comes only from verified auth; copy editable fields explicitly.
+    target = AnalysisTarget(
+        id=uuid4(),
+        owner_id=UUID(user.id),
+        name=body.name,
+        platform=body.platform,
+        source_url=body.source_url,
+    )
     db.add(target)
     db.commit()
     db.refresh(target)
@@ -56,7 +84,8 @@ def ingest(
     user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    owned(target_id, user, db)
+    # Child records inherit ownership from this authorized, persisted target.
+    target = owned(target_id, user, db)
     try:
         records = parse_csv_reviews(body.csv_text)
     except ReviewSourceError:
@@ -65,7 +94,7 @@ def ingest(
             "Provide a CSV with rating and review_text columns and 1–1,000 "
             "reviews (maximum 1 MB).",
         ) from None
-    run = IngestionRun(target_id=target_id)
+    run = IngestionRun(target_id=target.id)
     db.add(run)
     db.commit()
     db.refresh(run)
@@ -79,7 +108,7 @@ def ingest(
                 raise ValueError("invalid record or limit")
             rows.append(
                 Review(
-                    target_id=target_id, run_id=run_id, review_text=text, rating=rating
+                    target_id=target.id, run_id=run_id, review_text=text, rating=rating
                 )
             )
         if not rows:
@@ -126,11 +155,23 @@ def latest(
     )
 
 
-@router.get("/{target_id}")
+@router.get("/{target_id}", response_model=AnalysisTargetRead)
 def read_target(
     target_id: UUID,
     user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     target = owned(target_id, user, db)
-    return {"id": target.id, "name": target.name, "source_url": target.source_url}
+    return target
+
+
+@router.get("", response_model=list[target_list.AnalysisTargetResponse])
+def list_targets(
+    user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return db.scalars(
+        select(AnalysisTarget)
+        .where(AnalysisTarget.owner_id == UUID(user.id))
+        .order_by(AnalysisTarget.created_at.desc(), AnalysisTarget.id.desc())
+    ).all()

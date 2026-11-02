@@ -1,3 +1,5 @@
+"""Source adapters and normalization for ReviewLens review ingestion."""
+
 from app.reviews.normalization import (
     NormalizedReview,
     RejectedReview,

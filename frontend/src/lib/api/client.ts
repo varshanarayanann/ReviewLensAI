@@ -36,3 +36,13 @@ export async function getCurrentUser(
   }
   return (await response.json()) as CurrentUserResponse
 }
+
+export async function targetRequest<T>(base: string, path: string, token: string, body?: unknown): Promise<T> {
+  const response = await fetch(`${base}/api/targets${path}`, {
+    method: body === undefined ? 'GET' : 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  })
+  if (!response.ok) throw new ApiError(response.status)
+  return response.json() as Promise<T>
+}

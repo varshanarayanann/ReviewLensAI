@@ -1,3 +1,5 @@
+"""Review-source extraction and normalization."""
+
 from app.reviews.normalization import (
     NormalizedReview,
     RejectedReview,

@@ -1,0 +1,5 @@
+rating,review_text,source_review_id,reviewer_name,review_date,review_url
+5,"Fixture café review, with a comma.",fixture-review-001,Fixture reviewer A,2026-10-01,https://www.google.com/maps/reviews/example-001
+2,"Fixture first line.
+Fixture second line.",fixture-review-002,Fixture reviewer B,2026-10-02,https://www.google.com/maps/reviews/example-002
+4,"Fixture says ""thank you"" — ありがとう.",fixture-review-003,,2026-10-03,

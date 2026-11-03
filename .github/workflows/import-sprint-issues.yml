@@ -11,7 +11,7 @@ on:
       dry_run:
         description: "Preview what would be created without creating issues"
         required: true
-        default: true
+        default: false
         type: boolean
 
 permissions:

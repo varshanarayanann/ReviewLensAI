@@ -2,11 +2,20 @@ from datetime import datetime
 from enum import Enum
 from uuid import UUID
 
-from sqlalchemy import DateTime, ForeignKey, String, Text, Uuid, func
+from sqlalchemy import Column, DateTime, ForeignKey, String, Table, Text, Uuid, func
 from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
+
+# Supabase owns auth.users and migrations never create it, but the ORM must know
+# the referenced key to resolve owner_id's foreign key when it orders inserts.
+auth_users = Table(
+    "users",
+    Base.metadata,
+    Column("id", Uuid(as_uuid=True), primary_key=True),
+    schema="auth",
+)
 
 
 class ReviewPlatform(str, Enum):

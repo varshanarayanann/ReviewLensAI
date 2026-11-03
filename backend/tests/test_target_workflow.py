@@ -3,7 +3,7 @@ from pathlib import Path
 from uuid import UUID, uuid4
 
 import pytest
-from sqlalchemy import Column, Table, Uuid, create_engine, select, text
+from sqlalchemy import create_engine, select, text
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
@@ -18,9 +18,7 @@ USER_B_ID = "22222222-2222-4222-8222-222222222222"
 @pytest.fixture(params=["sqlite", "postgres"])
 def database(client, request):
     admin = None
-    users = Table(
-        "users", Base.metadata, Column("id", Uuid, primary_key=True), schema="auth"
-    )
+    users = Base.metadata.tables["auth.users"]
     engine = None
     database_name = "reviewlens_test_" + uuid4().hex
     try:
@@ -69,7 +67,6 @@ def database(client, request):
             with admin.connect() as connection:
                 connection.exec_driver_sql(f'DROP DATABASE IF EXISTS "{database_name}"')
             admin.dispose()
-        Base.metadata.remove(users)
 
 
 def test_created_records_belong_to_verified_subject(client, make_token, database):

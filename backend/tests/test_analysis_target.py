@@ -27,12 +27,6 @@ from app.models import AnalysisTarget, Base, ReviewPlatform
 def sqlite_target_db() -> Iterator[tuple[Engine, Table]]:
     # SQLite cannot create a cross-schema FK, so mirror it as a same-schema
     # test-only constraint. This is not PostgreSQL integration coverage.
-    auth_users = Table(
-        "users",
-        Base.metadata,
-        Column("id", Uuid(as_uuid=True), primary_key=True),
-        schema="auth",
-    )
     metadata = MetaData()
     sqlite_users = Table(
         "users",
@@ -69,7 +63,6 @@ def sqlite_target_db() -> Iterator[tuple[Engine, Table]]:
         metadata.create_all(engine)
         yield engine, sqlite_users
     finally:
-        Base.metadata.remove(auth_users)
         engine.dispose()
 
 
@@ -130,3 +123,10 @@ def test_analysis_target_rejects_nonexistent_owner(
 
         with pytest.raises(IntegrityError, match="FOREIGN KEY constraint failed"):
             session.commit()
+
+
+def test_owner_foreign_key_resolves_without_test_supplied_tables() -> None:
+    owner_foreign_key = next(iter(AnalysisTarget.__table__.c.owner_id.foreign_keys))
+
+    assert owner_foreign_key.column is Base.metadata.tables["auth.users"].c.id
+    assert Base.metadata.sorted_tables

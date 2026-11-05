@@ -151,16 +151,21 @@ Run these before opening a pull request.
 ```powershell
 python -m ruff check .
 python -m ruff format --check .
-python -m pytest
+python -m pytest --cov --cov-report=xml --cov-report=term
+diff-cover coverage.xml --compare-branch=origin/main --fail-under=80
 ```
 
 **Frontend** (from `frontend/`):
 
 ```powershell
 npm run lint
-npm test
+npm run test:coverage
+..\backend\.venv\Scripts\diff-cover.exe coverage\cobertura-coverage.xml --compare-branch=origin/main --fail-under=80
 npm run build
 ```
+
+Run `git fetch origin` before the `diff-cover` commands so they compare against
+the current `main`.
 
 ## My analysis targets (S1-017)
 
@@ -188,10 +193,14 @@ navigation, failures, and session changes using deterministic fixtures.
 to `main`, and on demand from the Actions tab. `Frontend` and `Backend` each run
 lint, build, and unit tests for one part of the repo:
 
-| Check | Lint | Build | Unit tests |
-| --- | --- | --- | --- |
-| `Frontend` | `npm run lint` (oxlint) | `npm run build` (TypeScript type check + Vite build) | `npm test` (Vitest) |
-| `Backend` | `ruff check` + `ruff format --check` | `compileall` + import of `app.main` | `pytest` |
+| Check | Lint | Build | Unit tests | Changed-code coverage (pull requests) |
+| --- | --- | --- | --- | --- |
+| `Frontend` | `npm run lint` (oxlint) | `npm run build` (TypeScript type check + Vite build) | `npm run test:coverage` (Vitest) | `diff-cover`, 80% of changed lines |
+| `Backend` | `ruff check` + `ruff format --check` | `compileall` + import of `app.main` | `pytest --cov` | `diff-cover`, 80% of changed lines |
+
+The coverage gate fails a pull request when fewer than 80% of the lines it adds or
+changes are run by tests. See [Changed-code coverage gate](docs/coverage-gate.md)
+for the policy, exclusions, and how to run it locally (S2-001).
 
 `Secrets` fails if any `.env` file (other than `.env.example`) is committed, and
 scans the full git history with [gitleaks](https://github.com/gitleaks/gitleaks)
@@ -318,3 +327,20 @@ and navigation after target creation work without it.
 
 The original S1-018 author can integrate the completed feature and update her
 existing draft PR using [the handoff instructions](docs/handoffs/s1-018-workspace.md).
+
+## Review Q&A and its test harness (S2-003)
+
+`POST /api/targets/{target_id}/questions` accepts `{"question": "..."}` and answers
+from the authenticated owner's persisted reviews for that target only. Another
+user's target returns the same 404 as a missing one, and a target with no reviews
+returns `status: "no_reviews"` without calling the model. Otherwise `status` is the
+model's outcome: `answered`, `insufficient_evidence`, or `out_of_scope`.
+
+[The scope-guard evaluation set](docs/scope-guard-evaluation.md) (S2-004) lists
+representative questions for each scope category, checked in CI without a model
+and runnable against a real model with `python -m evals.scope_eval`.
+
+No LLM provider is configured yet, so the running app returns 503 for questions.
+Tests replace the model with a recording fake, so CI needs no API key. See
+[the Q&A test harness](docs/qa-test-harness.md) for the model boundary, how to
+write Q&A tests, and what a real provider adapter must do.

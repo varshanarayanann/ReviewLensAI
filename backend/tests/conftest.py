@@ -14,6 +14,7 @@ from app.auth.tokens import (
 )
 from app.config import Settings, load_settings
 from app.main import create_app
+from tests.qa_harness import FakeLLMClient
 
 SUPABASE_URL = "https://test-project.supabase.co"
 ISSUER = f"{SUPABASE_URL}/auth/v1"
@@ -126,5 +127,14 @@ def token_verifier(
 
 
 @pytest.fixture
-def client(settings: Settings, token_verifier: TokenVerifier) -> TestClient:
-    return TestClient(create_app(settings, token_verifier=token_verifier))
+def fake_llm() -> FakeLLMClient:
+    return FakeLLMClient()
+
+
+@pytest.fixture
+def client(
+    settings: Settings, token_verifier: TokenVerifier, fake_llm: FakeLLMClient
+) -> TestClient:
+    return TestClient(
+        create_app(settings, token_verifier=token_verifier, llm_client=fake_llm)
+    )

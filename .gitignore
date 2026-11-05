@@ -23,6 +23,11 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 
+# Test coverage reports
+.coverage
+coverage.xml
+coverage/
+
 # Editor and OS files
 .vscode/*
 !.vscode/extensions.json

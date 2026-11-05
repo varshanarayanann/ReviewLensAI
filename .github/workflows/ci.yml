@@ -109,7 +109,7 @@ jobs:
 
       - name: Build
         run: |
-          python -m compileall -q app tests
+          python -m compileall -q app tests evals
           python -c "from app.main import create_app"
 
       - name: Unit tests with coverage

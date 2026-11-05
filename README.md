@@ -333,7 +333,12 @@ existing draft PR using [the handoff instructions](docs/handoffs/s1-018-workspac
 `POST /api/targets/{target_id}/questions` accepts `{"question": "..."}` and answers
 from the authenticated owner's persisted reviews for that target only. Another
 user's target returns the same 404 as a missing one, and a target with no reviews
-returns `status: "no_reviews"` without calling the model.
+returns `status: "no_reviews"` without calling the model. Otherwise `status` is the
+model's outcome: `answered`, `insufficient_evidence`, or `out_of_scope`.
+
+[The scope-guard evaluation set](docs/scope-guard-evaluation.md) (S2-004) lists
+representative questions for each scope category, checked in CI without a model
+and runnable against a real model with `python -m evals.scope_eval`.
 
 No LLM provider is configured yet, so the running app returns 503 for questions.
 Tests replace the model with a recording fake, so CI needs no API key. See

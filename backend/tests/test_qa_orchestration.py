@@ -6,7 +6,13 @@ import pytest
 
 from app.main import create_app
 from app.models.analysis_target import AnalysisTarget, ReviewPlatform
-from app.qa.llm import LLMRequest, LLMUnavailableError, UnconfiguredLLMClient
+from app.qa.llm import (
+    LLMRequest,
+    LLMResponse,
+    LLMUnavailableError,
+    ReplyOutcome,
+    UnconfiguredLLMClient,
+)
 from app.qa.prompt import build_system_prompt
 from tests.conftest import USER_A_ID
 from tests.qa_harness import (
@@ -142,6 +148,19 @@ def test_controlled_model_answer_is_returned_to_the_user(client, fake_llm, phone
         "answer": "Reviewers mostly praise the battery life.",
         "review_count": 3,
     }
+
+
+@pytest.mark.parametrize("outcome", list(ReplyOutcome))
+def test_each_model_outcome_is_reported_to_the_user(
+    client, fake_llm, phone_store, outcome
+):
+    owner, target_id = phone_store
+    fake_llm.respond_with(LLMResponse(outcome, "Controlled reply."))
+
+    body = ask(client, owner, target_id).json()
+
+    assert body["status"] == outcome.value
+    assert body["answer"] == "Controlled reply."
 
 
 def test_model_failure_returns_a_safe_error(client, fake_llm, phone_store, caplog):

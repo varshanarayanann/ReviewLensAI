@@ -10,7 +10,8 @@ Rules: S2-BR-009 through S2-BR-014, S2-BR-022, S2-BR-027 through S2-BR-031.
 
 | Piece | Location | Role |
 | --- | --- | --- |
-| Model boundary | `backend/app/qa/llm.py` | `LLMClient` protocol: `complete(LLMRequest) -> LLMResponse`, raising `LLMUnavailableError` on failure. |
+| Model boundary | `backend/app/qa/llm.py` | `LLMClient` protocol: `complete(LLMRequest) -> LLMResponse(outcome, text)`, raising `LLMUnavailableError` on failure. |
+| Reply parsing | `backend/app/qa/reply.py` | `parse_model_reply(raw)` reads the JSON reply format defined in the system prompt (S2-004). |
 | Request contract | `LLMRequest` | `system_prompt`, `question`, and `reviews`: a tuple of `ReviewContext(review_id, target_id, rating, text)`. |
 | System prompt | `backend/app/qa/prompt.py` | `build_system_prompt(target)`; names the target and platform and states the scope rules. |
 | Orchestration | `backend/app/qa/service.py` | `answer_question(...)` loads the owner's target and its persisted reviews, then calls the client. |
@@ -50,7 +51,8 @@ def test_example(client, fake_llm, phone_store):
 | `request.system_prompt` | Correct system instructions for the active target. |
 | `supplied_texts`, `supplied_review_ids`, `supplied_target_ids` | Exactly the right review context was supplied. |
 | `assert_not_in_context(request, ...)` | Wrong-target or cross-user text never reached the model. |
-| `respond_with("text")` | Application behavior for a controlled model answer. |
+| `respond_with("text")` | Application behavior for a controlled `answered` reply. |
+| `respond_with(LLMResponse(ReplyOutcome.OUT_OF_SCOPE, "..."))` | Behavior for a decline or an insufficient-evidence reply. |
 | `respond_with(LLMUnavailableError(...))` | Behavior when the provider fails. |
 
 Assert on these properties, not on exact generated wording (S2-BR-029, S2-BR-030).
@@ -61,7 +63,7 @@ SQLite and PostgreSQL.
 
 | Situation | Response | Model called? |
 | --- | --- | --- |
-| Owned target with reviews | `200 {target_id, status: "answered", answer, review_count}` | Yes |
+| Owned target with reviews | `200 {target_id, status, answer, review_count}`; `status` is the model's outcome: `answered`, `insufficient_evidence`, or `out_of_scope` | Yes |
 | Owned target with no reviews | `200 {status: "no_reviews", answer: null, review_count: 0}` | No |
 | Missing or another user's target | `404 {"detail": "Analysis target not found."}` | No |
 | Blank, too long (over 1,000 characters), or extra fields | `422` | No |
@@ -80,6 +82,7 @@ A provider adapter is a class with a `complete(request)` method, passed to
 `create_app` as `llm_client` in production. It must:
 
 - Keep its API key in `backend/.env` only (add the name to `.env.example`).
+- Return `parse_model_reply(raw_text)` so the reply follows the prompt's JSON format.
 - Convert every provider error and timeout into `LLMUnavailableError`.
 - Never log the question, review text, or answer.
 - Be unit tested with a mocked HTTP transport or SDK, never a live call in CI.

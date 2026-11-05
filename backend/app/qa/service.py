@@ -61,7 +61,7 @@ def answer_question(
     )
     return QuestionAnswer(
         target_id=target.id,
-        status=AnswerStatus.ANSWERED,
+        status=AnswerStatus(response.outcome.value),
         answer=response.text,
         review_count=len(reviews),
     )

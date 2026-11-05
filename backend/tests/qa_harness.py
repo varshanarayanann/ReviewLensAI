@@ -7,18 +7,24 @@ model's replies, including failures. No provider, API key, or network is used.
 
 from uuid import UUID
 
-from app.qa.llm import LLMRequest, LLMResponse
+from app.qa.llm import LLMRequest, LLMResponse, ReplyOutcome
 
 DEFAULT_ANSWER = "Scripted answer from the fake model."
+
+Scripted = str | LLMResponse | Exception
 
 
 class FakeLLMClient:
     def __init__(self) -> None:
         self.requests: list[LLMRequest] = []
-        self._scripted: list[str | Exception] = []
+        self._scripted: list[Scripted] = []
 
-    def respond_with(self, *outcomes: str | Exception) -> None:
-        """Queue replies in order; an exception instance is raised instead."""
+    def respond_with(self, *outcomes: Scripted) -> None:
+        """Queue replies in order.
+
+        A string is an "answered" reply, an LLMResponse sets any outcome, and an
+        exception instance is raised instead of replying.
+        """
         self._scripted.extend(outcomes)
 
     def complete(self, request: LLMRequest) -> LLMResponse:
@@ -26,7 +32,9 @@ class FakeLLMClient:
         outcome = self._scripted.pop(0) if self._scripted else DEFAULT_ANSWER
         if isinstance(outcome, Exception):
             raise outcome
-        return LLMResponse(text=outcome)
+        if isinstance(outcome, str):
+            return LLMResponse(outcome=ReplyOutcome.ANSWERED, text=outcome)
+        return outcome
 
     @property
     def last_request(self) -> LLMRequest:

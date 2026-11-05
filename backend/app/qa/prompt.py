@@ -16,4 +16,14 @@ def build_system_prompt(target: AnalysisTarget) -> str:
         "- Decline questions unrelated to these reviews, questions about any other "
         "product, business, or location, and questions about other review "
         "platforms.\n"
+        "\n"
+        "Reply with only a JSON object: "
+        '{"outcome": "<outcome>", "answer": "<text shown to the user>"}. '
+        "Use one of these outcomes:\n"
+        '- "answered": the supplied reviews support the answer.\n'
+        '- "insufficient_evidence": the question is about these reviews, but they '
+        "do not contain enough information. Say what is missing.\n"
+        '- "out_of_scope": the question is outside these reviews. Explain that '
+        f'ReviewLens only answers questions about the {platform} reviews of "'
+        f'{target.name}".\n'
     )

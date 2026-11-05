@@ -14,6 +14,8 @@ class QuestionRequest(BaseModel):
 
 class AnswerStatus(str, Enum):
     ANSWERED = "answered"
+    INSUFFICIENT_EVIDENCE = "insufficient_evidence"
+    OUT_OF_SCOPE = "out_of_scope"
     NO_REVIEWS = "no_reviews"
 
 

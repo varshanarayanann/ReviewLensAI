@@ -58,6 +58,7 @@ job's summary page, so reviewers can see it before merging.
 | `frontend/src/**/*.d.ts` | Type declarations contain no executable code. |
 | `backend/migrations/*.sql` | SQL, not Python; the PostgreSQL migration tests in CI verify them. |
 | `if TYPE_CHECKING:` blocks (backend) | Imports that only run during type checking, never at runtime. |
+| `backend/evals/` | Evaluation tooling run manually against a live model, not application code. `tests/test_scope_guard_eval.py` still tests it. |
 | Config, CSS, docs, and workflow files | Not executable application code; coverage tools do not instrument them. |
 
 Configuration lives in `[tool.coverage.*]` in `backend/pyproject.toml` and in the

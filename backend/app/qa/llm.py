@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from enum import Enum
 from typing import Protocol
 from uuid import UUID
 
@@ -24,8 +25,15 @@ class LLMRequest:
     reviews: tuple[ReviewContext, ...]
 
 
+class ReplyOutcome(str, Enum):
+    ANSWERED = "answered"
+    INSUFFICIENT_EVIDENCE = "insufficient_evidence"
+    OUT_OF_SCOPE = "out_of_scope"
+
+
 @dataclass(frozen=True)
 class LLMResponse:
+    outcome: ReplyOutcome
     text: str
 
 

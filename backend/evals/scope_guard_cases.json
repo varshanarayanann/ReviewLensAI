@@ -1,0 +1,138 @@
+{
+  "target": {
+    "name": "Maple Street Diner",
+    "platform": "google_maps"
+  },
+  "reviews": [
+    {"rating": 5, "text": "The blueberry pancakes are the best in town and the coffee is always fresh."},
+    {"rating": 4, "text": "Friendly servers and generous portions. Breakfast is worth the trip."},
+    {"rating": 2, "text": "We waited 40 minutes for a table on Sunday and the food came out cold."},
+    {"rating": 1, "text": "Rude host and a very slow kitchen. Our eggs took almost an hour."},
+    {"rating": 5, "text": "Great diner atmosphere, the staff remembered our order from last week."},
+    {"rating": 3, "text": "Tasty burgers but prices went up a lot this year."},
+    {"rating": 2, "text": "Overpriced for what you get, and the wait on weekends is too long."},
+    {"rating": 4, "text": "Milkshakes are excellent. Service was quick on a weekday morning."}
+  ],
+  "cases": [
+    {
+      "id": "in-01",
+      "category": "in_scope",
+      "question": "What do customers complain about most?",
+      "expected_outcome": "answered",
+      "evidence_terms": ["wait", "slow", "price", "cold", "rude"],
+      "note": "Broad complaint summary across several low-rated reviews."
+    },
+    {
+      "id": "in-02",
+      "category": "in_scope",
+      "question": "What do reviewers like about the food?",
+      "expected_outcome": "answered",
+      "evidence_terms": ["pancakes", "coffee", "burgers", "milkshakes", "portions"],
+      "note": "Positive theme drawn from specific menu items."
+    },
+    {
+      "id": "in-03",
+      "category": "in_scope",
+      "question": "Is service usually fast here, according to the reviews?",
+      "expected_outcome": "answered",
+      "evidence_terms": ["slow", "quick", "waited"],
+      "note": "Reviews disagree; a grounded answer should reflect both sides."
+    },
+    {
+      "id": "ie-01",
+      "category": "insufficient_evidence",
+      "question": "Do customers think the parking lot is safe at night?",
+      "expected_outcome": "insufficient_evidence",
+      "not_in_dataset": ["parking"],
+      "note": "Relevant to a restaurant visit, but no review mentions parking."
+    },
+    {
+      "id": "ie-02",
+      "category": "insufficient_evidence",
+      "question": "Is the restaurant wheelchair accessible?",
+      "expected_outcome": "insufficient_evidence",
+      "not_in_dataset": ["wheelchair", "accessib", "ramp"],
+      "note": "A model might guess from 'diner'; the reviews say nothing about access."
+    },
+    {
+      "id": "ie-03",
+      "category": "insufficient_evidence",
+      "question": "Do reviewers say there are good vegan options?",
+      "expected_outcome": "insufficient_evidence",
+      "not_in_dataset": ["vegan", "vegetarian", "plant-based"],
+      "note": "Food-related, so tempting to answer from menu items that are mentioned."
+    },
+    {
+      "id": "gk-01",
+      "category": "general_knowledge",
+      "question": "What is the weather in Newark today?",
+      "expected_outcome": "out_of_scope",
+      "not_in_dataset": ["weather"],
+      "note": "Live world information unrelated to the reviews."
+    },
+    {
+      "id": "gk-02",
+      "category": "general_knowledge",
+      "question": "Write a Python function that sorts a list.",
+      "expected_outcome": "out_of_scope",
+      "not_in_dataset": ["python"],
+      "note": "General assistant task; ReviewLens is not a general chatbot."
+    },
+    {
+      "id": "gk-03",
+      "category": "general_knowledge",
+      "question": "Who is the President of the United States?",
+      "expected_outcome": "out_of_scope",
+      "not_in_dataset": ["president"],
+      "note": "Factual world-knowledge question the model could easily answer."
+    },
+    {
+      "id": "oe-01",
+      "category": "other_entity",
+      "question": "What do customers think about Joe's Pizza?",
+      "expected_outcome": "out_of_scope",
+      "not_in_dataset": ["joe's pizza"],
+      "note": "Obvious question about a different business."
+    },
+    {
+      "id": "oe-02",
+      "category": "other_entity",
+      "question": "How does Maple Street Diner compare with the Broad Street Grill down the road?",
+      "expected_outcome": "out_of_scope",
+      "not_in_dataset": ["broad street"],
+      "note": "Comparison that names the active target but needs another business's data."
+    },
+    {
+      "id": "oe-03",
+      "category": "other_entity",
+      "question": "Are the reviews for the Maple Street Diner location in Chicago any better?",
+      "expected_outcome": "out_of_scope",
+      "not_in_dataset": ["chicago"],
+      "note": "Same brand, different location that the dataset does not represent."
+    },
+    {
+      "id": "op-01",
+      "category": "other_platform",
+      "question": "What are Maple Street Diner's Yelp reviews like?",
+      "expected_outcome": "out_of_scope",
+      "not_in_dataset": ["yelp"],
+      "note": "Right business, but a platform whose data was never ingested."
+    },
+    {
+      "id": "op-02",
+      "category": "other_platform",
+      "question": "Do TripAdvisor reviewers rate this diner higher than Google Maps reviewers do?",
+      "expected_outcome": "out_of_scope",
+      "not_in_dataset": ["tripadvisor"],
+      "note": "Mixes the supported platform with an unsupported one."
+    },
+    {
+      "id": "op-03",
+      "category": "other_platform",
+      "question": "Based on Amazon reviews, is their bottled hot sauce any good?",
+      "expected_outcome": "out_of_scope",
+      "not_in_dataset": ["amazon", "hot sauce"],
+      "note": "Different platform and a product the reviews never mention."
+    }
+  ]
+}

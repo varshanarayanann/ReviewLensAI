@@ -3,13 +3,16 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import health, me, targets
+from app.api import health, me, questions, targets
 from app.auth.tokens import TokenVerifier
 from app.config import Settings, get_settings
+from app.qa.llm import LLMClient, UnconfiguredLLMClient
 
 
 def create_app(
-    settings: Settings | None = None, token_verifier: TokenVerifier | None = None
+    settings: Settings | None = None,
+    token_verifier: TokenVerifier | None = None,
+    llm_client: LLMClient | None = None,
 ) -> FastAPI:
     settings = settings or get_settings()
     logging.basicConfig(level=logging.INFO)
@@ -25,6 +28,7 @@ def create_app(
         settings.supabase_auth_issuer,
         settings.supabase_publishable_key,
     )
+    app.state.llm_client = llm_client or UnconfiguredLLMClient()
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
@@ -35,4 +39,5 @@ def create_app(
     app.include_router(health.router)
     app.include_router(me.router)
     app.include_router(targets.router)
+    app.include_router(questions.router)
     return app

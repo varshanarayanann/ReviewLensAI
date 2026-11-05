@@ -327,3 +327,15 @@ and navigation after target creation work without it.
 
 The original S1-018 author can integrate the completed feature and update her
 existing draft PR using [the handoff instructions](docs/handoffs/s1-018-workspace.md).
+
+## Review Q&A and its test harness (S2-003)
+
+`POST /api/targets/{target_id}/questions` accepts `{"question": "..."}` and answers
+from the authenticated owner's persisted reviews for that target only. Another
+user's target returns the same 404 as a missing one, and a target with no reviews
+returns `status: "no_reviews"` without calling the model.
+
+No LLM provider is configured yet, so the running app returns 503 for questions.
+Tests replace the model with a recording fake, so CI needs no API key. See
+[the Q&A test harness](docs/qa-test-harness.md) for the model boundary, how to
+write Q&A tests, and what a real provider adapter must do.

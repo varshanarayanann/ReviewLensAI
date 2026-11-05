@@ -18,6 +18,7 @@ from tests.qa_harness import (
 from tests.test_review_dataset_integration import (
     BATTERY_CSV,
     SERVICE_CSV,
+    ask,
     create_target,
     ingest,
     review_rows,
@@ -35,14 +36,6 @@ SERVICE_TEXTS = {
     "Customer service never called back",
     "Customer service was polite but slow",
 }
-
-
-def ask(client, headers, target_id, question="What do customers complain about?"):
-    return client.post(
-        f"/api/targets/{target_id}/questions",
-        headers=headers,
-        json={"question": question},
-    )
 
 
 @pytest.fixture

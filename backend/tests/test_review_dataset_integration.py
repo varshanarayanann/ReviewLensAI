@@ -1,4 +1,8 @@
-"""Integration tests across CSV ingestion, persistence, ownership, and retrieval."""
+"""Integration tests across CSV ingestion, persistence, ownership, retrieval, and Q&A.
+
+Q&A tests use the recording fake model from tests/qa_harness.py (S2-003) and
+check the review context that crosses the model boundary.
+"""
 
 from uuid import UUID, uuid4
 
@@ -9,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.models import Base
 from app.models.ingestion import IngestionRun, Review
 from tests.conftest import USER_A_ID
+from tests.qa_harness import assert_not_in_context, supplied_review_ids, supplied_texts
 from tests.test_target_workflow import USER_B_ID
 from tests.test_target_workflow import database as database  # Shared DB fixture.
 
@@ -88,6 +93,30 @@ def latest(client, headers, target_id):
     )
     assert response.status_code == 200
     return response.json()
+
+
+def listable_review_ids(client, headers, target_id):
+    ids, offset = set(), 0
+    while True:
+        response = client.get(
+            f"/api/targets/{target_id}/reviews",
+            headers=headers,
+            params={"limit": 100, "offset": offset},
+        )
+        assert response.status_code == 200
+        page = response.json()
+        if not page:
+            return ids
+        ids |= {UUID(row["id"]) for row in page}
+        offset += len(page)
+
+
+def ask(client, headers, target_id, question="What do customers complain about?"):
+    return client.post(
+        f"/api/targets/{target_id}/questions",
+        headers=headers,
+        json={"question": question},
+    )
 
 
 def test_uploaded_csv_is_retrievable_as_the_persisted_dataset(
@@ -179,3 +208,87 @@ def test_selecting_another_users_target_is_denied_before_data_is_read(
     assert "Battery" not in denied.text and "Phone store" not in denied.text
     assert dataset(client, user_b, own) == SERVICE_DATASET
     assert dataset(client, user_a, private) == BATTERY_DATASET
+
+
+def test_qa_context_is_the_same_dataset_the_user_can_list(client, fake_llm, as_user):
+    owner = as_user()
+    target_id = create_target(client, owner, "Busy store")
+    rows = "\n".join(f"{index % 5 + 1},Review number {index}" for index in range(150))
+    ingest(client, owner, target_id, f"rating,review_text\n{rows}")
+
+    response = ask(client, owner, target_id)
+
+    assert response.status_code == 200
+    assert response.json()["review_count"] == 150
+    assert supplied_review_ids(fake_llm.last_request) == listable_review_ids(
+        client, owner, target_id
+    )
+
+
+def test_new_uploads_reach_qa_and_rejected_uploads_do_not(client, fake_llm, as_user):
+    owner = as_user()
+    target_id = create_target(client, owner, "Phone store")
+    ingest(client, owner, target_id, BATTERY_CSV)
+    ask(client, owner, target_id)
+    before = supplied_texts(fake_llm.last_request)
+
+    rejected = ingest(
+        client,
+        owner,
+        target_id,
+        "rating,review_text\n5,Looks valid but shares a file\nnot-a-number,Broken",
+    )
+    assert rejected["state"] == "failed"
+    ask(client, owner, target_id)
+    assert supplied_texts(fake_llm.last_request) == before
+    assert_not_in_context(fake_llm.last_request, "Looks valid", "Broken")
+
+    ingest(client, owner, target_id, "rating,review_text\n4,Battery swap was free")
+    ask(client, owner, target_id)
+    assert "Battery swap was free" in supplied_texts(fake_llm.last_request)
+    assert supplied_review_ids(fake_llm.last_request) == listable_review_ids(
+        client, owner, target_id
+    )
+
+
+def test_target_becomes_answerable_only_after_successful_ingestion(
+    client, fake_llm, as_user
+):
+    owner = as_user()
+    target_id = create_target(client, owner, "New store")
+
+    assert ask(client, owner, target_id).json()["status"] == "no_reviews"
+    ingest(client, owner, target_id, "rating,review_text\n9,Out of range rating")
+    assert ask(client, owner, target_id).json()["status"] == "no_reviews"
+    assert fake_llm.requests == []
+
+    ingest(client, owner, target_id, SERVICE_CSV)
+    answered = ask(client, owner, target_id).json()
+
+    assert answered["status"] == "answered"
+    assert len(fake_llm.requests) == 1
+    assert supplied_texts(fake_llm.last_request) == {
+        text for _, text in SERVICE_DATASET
+    }
+
+
+def test_switching_targets_between_uploads_keeps_qa_contexts_separate(
+    client, fake_llm, as_user
+):
+    owner = as_user()
+    battery = create_target(client, owner, "Phone store")
+    service = create_target(client, owner, "Call center")
+    ingest(client, owner, battery, BATTERY_CSV)
+    ingest(client, owner, service, SERVICE_CSV)
+
+    ask(client, owner, battery)
+    battery_context = supplied_texts(fake_llm.last_request)
+    ingest(client, owner, service, "rating,review_text\n2,Customer service hung up")
+    ask(client, owner, service)
+
+    assert "Customer service hung up" in supplied_texts(fake_llm.last_request)
+    assert_not_in_context(fake_llm.last_request, "Battery", "Phone store")
+
+    ask(client, owner, battery)
+    assert supplied_texts(fake_llm.last_request) == battery_context
+    assert_not_in_context(fake_llm.last_request, "Customer service", "Call center")

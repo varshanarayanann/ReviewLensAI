@@ -46,7 +46,11 @@ class LLMClient(Protocol):
         """Return the model's answer or raise LLMUnavailableError.
 
         Adapters must translate provider errors into LLMUnavailableError and
-        must not log the question, reviews, or answer.
+        must not log the question, reviews, or answer. Each call is independent:
+        never reuse provider conversation/history or previous-response IDs.
+        Send only this request, preserving reviews as untrusted data separate
+        from system instructions. Check the actual provider token budget,
+        reserving output capacity, and fail rather than silently truncating.
         """
         ...
 

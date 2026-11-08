@@ -34,6 +34,7 @@ def test_submitted_export_is_persisted_without_replacement(
     assert imported.status_code == 200
     assert imported.json()["state"] == "succeeded"
     assert imported.json()["persisted_count"] == 3
+    assert imported.json()["rejected_count"] == 0
     with Session(database) as db:
         rows = db.scalars(select(Review)).all()
         assert {(row.rating, row.review_text) for row in rows} == {

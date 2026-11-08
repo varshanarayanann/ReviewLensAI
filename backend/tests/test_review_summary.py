@@ -163,7 +163,7 @@ def test_failed_ingestion_does_not_change_existing_summary(
     ingest(client, auth, target_id, "5,Great\n3,Good")
     before = summary(client, auth, target_id).json()
 
-    failed = ingest(client, auth, target_id, "4,Would be valid\ninvalid,Broken")
+    failed = ingest(client, auth, target_id, "invalid,Broken\nalso invalid,Wrong")
     after = summary(client, auth, target_id)
 
     assert failed["state"] == "failed"

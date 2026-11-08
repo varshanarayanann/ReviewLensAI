@@ -4,6 +4,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy import create_engine, select, text
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
@@ -208,7 +209,13 @@ def test_validation_ingestion_and_failure_preserves_reviews(
     failed = client.post(
         path, headers=headers, json={"csv_text": "rating,review_text\ninvalid,Text"}
     )
+    assert failed.status_code == 200
     assert failed.json()["state"] == "failed"
+    assert failed.json()["persisted_count"] == 0
+    assert failed.json()["rejected_count"] == 1
+    assert failed.json()["message"] == (
+        "Imported 0 reviews; rejected 1 record. Check the review text and ratings."
+    )
     assert "invalid" not in failed.json()["message"]
     restored = client.get(path + "/latest", headers=headers)
     assert restored.status_code == 200
@@ -220,7 +227,10 @@ def test_validation_ingestion_and_failure_preserves_reviews(
         assert sorted(persisted) == ["failed", "succeeded"]
     with Session(database) as db:
         assert len(db.scalars(select(Review)).all()) == 1
-        assert len(db.scalars(select(IngestionRun)).all()) == 2
+        runs = db.scalars(select(IngestionRun).order_by(IngestionRun.created_at)).all()
+        assert len(runs) == 2
+        assert runs[-1].state == "failed"
+        assert runs[-1].persisted_count == 0 and runs[-1].rejected_count == 1
     other_token = make_token(sub="22222222-2222-4222-8222-222222222222")
     other = {"Authorization": f"Bearer {other_token}"}
     assert client.get(path + "/latest", headers=other).status_code == 404
@@ -243,13 +253,21 @@ def test_persistence_error_records_failure(client, make_token, database, caplog)
         headers=headers,
         json={"name": "Example", "source_url": "https://google.com/maps/place/X"},
     ).json()["id"]
+    prior = client.post(
+        f"/api/targets/{target}/ingestions",
+        headers=headers,
+        json={"csv_text": "rating,review_text\n4,Previously persisted"},
+    )
+    assert prior.json()["state"] == "succeeded"
 
     def fail_reviews(session, context, instances):
         if any(isinstance(item, Review) for item in session.new):
             if session.bind.dialect.name == "postgresql":
                 # A real server error aborts the transaction until rollback.
                 session.execute(text("SELECT 1 / 0"))
-            raise RuntimeError("sensitive database detail")
+            raise OperationalError(
+                "INSERT INTO reviews", {}, RuntimeError("sensitive database detail")
+            )
 
     event.listen(Session, "before_flush", fail_reviews)
     try:
@@ -261,13 +279,134 @@ def test_persistence_error_records_failure(client, make_token, database, caplog)
     finally:
         event.remove(Session, "before_flush", fail_reviews)
     assert response.json()["state"] == "failed"
+    assert response.json()["persisted_count"] == 0
+    assert response.json()["rejected_count"] == 0
     assert "sensitive" not in response.text
     assert "Ingestion" in caplog.text and "failed" in caplog.text
     assert "sensitive database detail" not in caplog.text
     assert "SELECT 1 / 0" not in caplog.text
     with Session(database) as db:
-        assert not db.scalars(select(Review)).all()
-        assert db.scalar(select(IngestionRun)).state == "failed"
+        reviews = db.scalars(select(Review)).all()
+        assert [(review.rating, review.review_text) for review in reviews] == [
+            (4, "Previously persisted")
+        ]
+        failed_run_id = UUID(response.json()["run_id"])
+        failed_run = db.scalar(
+            select(IngestionRun).where(IngestionRun.id == failed_run_id)
+        )
+        assert failed_run.state == "failed"
+        assert failed_run.persisted_count == 0 and failed_run.rejected_count == 0
+
+
+def test_initial_ingestion_run_commit_failure_returns_safe_503(
+    client, make_token, database, monkeypatch
+):
+    headers = {"Authorization": "Bearer " + make_token()}
+    target = client.post(
+        "/api/targets",
+        headers=headers,
+        json={"name": "Example", "source_url": "https://google.com/maps/place/X"},
+    ).json()["id"]
+    commit_calls = 0
+    rollback_calls = 0
+    original_rollback = Session.rollback
+
+    def fail_commit(session):
+        nonlocal commit_calls
+        commit_calls += 1
+        raise OperationalError(
+            "INSERT INTO ingestion_runs", {}, RuntimeError("private database detail")
+        )
+
+    def track_rollback(session):
+        nonlocal rollback_calls
+        rollback_calls += 1
+        return original_rollback(session)
+
+    monkeypatch.setattr(Session, "commit", fail_commit)
+    monkeypatch.setattr(Session, "rollback", track_rollback)
+
+    response = client.post(
+        f"/api/targets/{target}/ingestions",
+        headers=headers,
+        json={"csv_text": "rating,review_text\n5,New review"},
+    )
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "detail": "Ingestion could not be recorded. Please try again shortly."
+    }
+    assert "private database detail" not in response.text
+    assert commit_calls == 1
+    assert rollback_calls >= 1
+    with Session(database) as db:
+        assert db.scalars(select(IngestionRun)).all() == []
+        assert db.scalars(select(Review)).all() == []
+
+
+def test_recovery_commit_failure_returns_safe_503_without_partial_reviews(
+    client, make_token, database, monkeypatch
+):
+    headers = {"Authorization": "Bearer " + make_token()}
+    target = client.post(
+        "/api/targets",
+        headers=headers,
+        json={"name": "Example", "source_url": "https://google.com/maps/place/X"},
+    ).json()["id"]
+    prior = client.post(
+        f"/api/targets/{target}/ingestions",
+        headers=headers,
+        json={"csv_text": "rating,review_text\n4,Previously persisted"},
+    )
+    assert prior.json()["state"] == "succeeded"
+
+    commit_calls = 0
+    rollback_calls = 0
+    original_commit = Session.commit
+    original_rollback = Session.rollback
+
+    def fail_review_and_recovery_commits(session):
+        nonlocal commit_calls
+        commit_calls += 1
+        if commit_calls in (2, 3):
+            raise OperationalError(
+                "COMMIT", {}, RuntimeError("private connection diagnostic")
+            )
+        return original_commit(session)
+
+    def track_rollback(session):
+        nonlocal rollback_calls
+        rollback_calls += 1
+        return original_rollback(session)
+
+    monkeypatch.setattr(Session, "commit", fail_review_and_recovery_commits)
+    monkeypatch.setattr(Session, "rollback", track_rollback)
+
+    response = client.post(
+        f"/api/targets/{target}/ingestions",
+        headers=headers,
+        json={"csv_text": "rating,review_text\n5,New review"},
+    )
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "detail": "Ingestion could not be recorded. Please try again shortly."
+    }
+    assert "private connection diagnostic" not in response.text
+    assert commit_calls == 3
+    assert rollback_calls >= 2
+    with Session(database) as db:
+        reviews = db.scalars(select(Review)).all()
+        assert [(review.rating, review.review_text) for review in reviews] == [
+            (4, "Previously persisted")
+        ]
+        runs = db.scalars(
+            select(IngestionRun).order_by(IngestionRun.created_at, IngestionRun.id)
+        ).all()
+        assert len(runs) == 2
+        assert runs[0].state == "succeeded"
+        assert runs[1].state == "processing"
+        assert runs[1].persisted_count == 0 and runs[1].rejected_count == 0
 
 
 @pytest.fixture

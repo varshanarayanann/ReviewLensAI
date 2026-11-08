@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-type AlertVariant = 'danger' | 'success' | 'info'
+type AlertVariant = 'danger' | 'warning' | 'success' | 'info'
 
 export function Alert({ variant, children }: { variant: AlertVariant; children: ReactNode }) {
   return (

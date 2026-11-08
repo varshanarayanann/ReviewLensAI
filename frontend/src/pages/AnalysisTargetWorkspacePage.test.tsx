@@ -8,7 +8,10 @@ import { createFakeAuth, fakeSession } from '../test/fakeAuth'
 
 const config = { apiBaseUrl: 'http://api.test', supabaseUrl: 'https://auth.test', supabaseAnonKey: 'public' }
 const target = { id: 'target-a', name: 'Example Cafe', platform: 'google_maps', source_url: 'https://google.com/maps/place/Cafe' }
-const succeeded = { run_id: 'run-a', target_id: target.id, state: 'succeeded', persisted_count: 1, message: 'Ingested 1 reviews.' }
+const succeeded = { run_id: 'run-a', target_id: target.id, state: 'succeeded', persisted_count: 1, rejected_count: 0, message: 'Imported 1 review; rejected 0 records.' }
+const partial = { run_id: 'run-partial', target_id: target.id, state: 'partial', persisted_count: 2, rejected_count: 1, message: 'Imported 2 reviews; rejected 1 record.' }
+const rejected = { run_id: 'run-rejected', target_id: target.id, state: 'failed', persisted_count: 0, rejected_count: 3, message: 'Imported 0 reviews; rejected 3 records. Check the review text and ratings.' }
+const persistenceFailure = { run_id: 'run-failure', target_id: target.id, state: 'failed', persisted_count: 0, rejected_count: 0, message: 'Reviews could not be collected. Try again shortly.' }
 const emptySummary = { target_id: target.id, review_count: 0, average_rating: null }
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status })
 let fetchMock: ReturnType<typeof vi.fn>
@@ -150,7 +153,13 @@ it.each([
 ])('restores persisted ingestion state %s', async (state, label) => {
   fetchMock.mockImplementation((url: string) => Promise.resolve(json(
     url.endsWith('/latest')
-      ? { ...succeeded, state, message: 'Recorded result', persisted_count: state === 'succeeded' ? 1 : 0 }
+      ? {
+          ...succeeded,
+          state,
+          message: 'Recorded result',
+          persisted_count: state === 'succeeded' || state === 'partial' ? 1 : 0,
+          rejected_count: state === 'partial' ? 1 : 0,
+        }
       : defaultResponse(url),
   )))
   showWorkspace()
@@ -173,6 +182,8 @@ it('uploads to the active target and displays the persisted result after refresh
   chooseFile()
   fireEvent.click(screen.getByRole('button', { name: 'Upload reviews' }))
   expect(await screen.findByText('Ingested')).toBeInTheDocument()
+  expect(screen.getByRole('status')).toHaveClass('alert--success')
+  expect(screen.getByRole('status')).toHaveTextContent('Imported 1 review; rejected 0 records.')
   expect(fetchMock).toHaveBeenCalledWith('http://api.test/api/targets/target-a/ingestions', expect.objectContaining({
     method: 'POST', body: JSON.stringify({ csv_text: 'rating,review_text\n5,Great' }),
   }))
@@ -180,6 +191,90 @@ it('uploads to the active target and displays the persisted result after refresh
   expect(screen.getByText('5.0 / 5')).toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Refresh workspace' }))
   expect(await screen.findByText(succeeded.message)).toBeInTheDocument()
+})
+
+it('shows partial ingestion counts with warning semantics', async () => {
+  let saved = false
+  const persistedSummary = { target_id: target.id, review_count: 2, average_rating: 4 }
+  fetchMock.mockImplementation((url: string, options?: RequestInit) => {
+    if (options?.method === 'POST') {
+      saved = true
+      return Promise.resolve(json(partial))
+    }
+    return Promise.resolve(json(url.endsWith('/latest') ? null
+      : url.endsWith('/reviews/summary') ? saved ? persistedSummary : emptySummary
+        : target))
+  })
+  showWorkspace()
+  await screen.findByRole('heading', { name: target.name })
+  chooseFile()
+  fireEvent.click(screen.getByRole('button', { name: 'Upload reviews' }))
+
+  const alert = await screen.findByRole('status')
+  expect(alert).toHaveClass('alert--warning')
+  expect(alert).toHaveTextContent('Imported 2 reviews; rejected 1 record.')
+  expect(screen.getByText('Partially ingested')).toHaveClass('workspace-status--partial')
+  expect(screen.queryByText('Imported 3 reviews')).not.toBeInTheDocument()
+  expect(await screen.findByText('2 reviews')).toBeInTheDocument()
+  expect(screen.getByText('4.0 / 5')).toBeInTheDocument()
+})
+
+it('shows fully rejected content counts and failure semantics', async () => {
+  fetchMock.mockImplementation((url: string, options?: RequestInit) => Promise.resolve(json(
+    options?.method === 'POST' ? rejected : defaultResponse(url),
+  )))
+  showWorkspace()
+  await screen.findByRole('heading', { name: target.name })
+  chooseFile()
+  fireEvent.click(screen.getByRole('button', { name: 'Upload reviews' }))
+
+  const alert = await screen.findByRole('alert')
+  expect(alert).toHaveClass('alert--danger')
+  expect(alert).toHaveTextContent('Imported 0 reviews; rejected 3 records.')
+  expect(screen.getByText('Failed')).toHaveClass('workspace-status--failed')
+})
+
+it('shows a generic persistence failure when no content records were rejected', async () => {
+  fetchMock.mockImplementation((url: string, options?: RequestInit) => Promise.resolve(json(
+    options?.method === 'POST' ? persistenceFailure : defaultResponse(url),
+  )))
+  showWorkspace()
+  await screen.findByRole('heading', { name: target.name })
+  chooseFile()
+  fireEvent.click(screen.getByRole('button', { name: 'Upload reviews' }))
+
+  const alert = await screen.findByRole('alert')
+  expect(alert).toHaveClass('alert--danger')
+  expect(alert).toHaveTextContent('Reviews could not be collected. Try again shortly.')
+  expect(alert).not.toHaveTextContent('rejected')
+})
+
+it('restores the latest partial outcome and warning alert after workspace refresh', async () => {
+  let hasPartialResult = false
+  const persistedSummary = { target_id: target.id, review_count: 2, average_rating: 4 }
+  fetchMock.mockImplementation((url: string, options?: RequestInit) => {
+    if (options?.method === 'POST') {
+      hasPartialResult = true
+      return Promise.resolve(json(partial))
+    }
+    return Promise.resolve(json(url.endsWith('/latest')
+      ? hasPartialResult ? partial : null
+      : url.endsWith('/reviews/summary') ? persistedSummary : target))
+  })
+  showWorkspace()
+  await screen.findByRole('heading', { name: target.name })
+  chooseFile()
+  fireEvent.click(screen.getByRole('button', { name: 'Upload reviews' }))
+  expect(await screen.findByRole('status')).toHaveTextContent(partial.message)
+
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh workspace' }))
+
+  const restored = await screen.findByRole('status')
+  expect(restored).toHaveClass('alert--warning')
+  expect(restored).toHaveTextContent('Imported 2 reviews; rejected 1 record.')
+  expect(screen.getByText('Partially ingested')).toHaveClass('workspace-status--partial')
+  expect(screen.getByText('2 reviews')).toBeInTheDocument()
+  expect(screen.getByText('4.0 / 5')).toBeInTheDocument()
 })
 
 it('does not let an older summary request overwrite a post-ingestion summary', async () => {
@@ -199,7 +294,6 @@ it('does not let an older summary request overwrite a post-ingestion summary', a
   await screen.findByRole('heading', { name: target.name })
   chooseFile()
   fireEvent.click(screen.getByRole('button', { name: 'Upload reviews' }))
-
   expect(await screen.findByText('1 review')).toBeInTheDocument()
   await act(async () => resolveInitialSummary(json(emptySummary)))
 

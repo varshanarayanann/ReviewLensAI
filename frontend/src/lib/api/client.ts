@@ -21,8 +21,9 @@ export interface AnalysisTargetResponse extends WorkspaceTargetResponse {
 export interface IngestionResultResponse {
   run_id: string
   target_id: string
-  state: 'processing' | 'succeeded' | 'failed'
+  state: 'processing' | 'succeeded' | 'partial' | 'failed'
   persisted_count: number
+  rejected_count: number
   message: string
 }
 

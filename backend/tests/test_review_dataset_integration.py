@@ -1,9 +1,11 @@
-"""Integration tests across CSV ingestion, persistence, ownership, retrieval, and Q&A.
+"""Integration tests across CSV ingestion, persistence, ownership, retrieval,
+the review summary, and Q&A (S2-002).
 
 Q&A tests use the recording fake model from tests/qa_harness.py (S2-003) and
 check the review context that crosses the model boundary.
 """
 
+from statistics import mean
 from uuid import UUID, uuid4
 
 import pytest
@@ -109,6 +111,12 @@ def listable_review_ids(client, headers, target_id):
             return ids
         ids |= {UUID(row["id"]) for row in page}
         offset += len(page)
+
+
+def summary(client, headers, target_id):
+    response = client.get(f"/api/targets/{target_id}/reviews/summary", headers=headers)
+    assert response.status_code == 200
+    return response.json()
 
 
 def ask(client, headers, target_id, question="What do customers complain about?"):
@@ -305,3 +313,68 @@ def test_switching_targets_between_uploads_keeps_qa_contexts_separate(
     ask(client, owner, battery)
     assert supplied_texts(fake_llm.last_request) == battery_context
     assert_not_in_context(fake_llm.last_request, "Customer service", "Call center")
+
+
+def assert_summary_matches_qa_context(summary_json, request, target_id):
+    assert summary_json["target_id"] == target_id
+    assert summary_json["review_count"] == len(request.reviews)
+    assert summary_json["average_rating"] == pytest.approx(
+        mean(review.rating for review in request.reviews)
+    )
+
+
+def test_summary_describes_the_same_dataset_qa_uses(client, fake_llm, as_user):
+    owner = as_user()
+    target_id = create_target(client, owner, "Phone store")
+    ingest(client, owner, target_id, BATTERY_CSV)
+    partial = ingest(
+        client,
+        owner,
+        target_id,
+        "rating,review_text\n1,Battery died on day one\nseven,Not a rating",
+    )
+    failed = ingest(client, owner, target_id, "rating,review_text\nbad,Broken")
+    assert (partial["state"], partial["rejected_count"]) == ("partial", 1)
+    assert failed["state"] == "failed"
+
+    answer = ask(client, owner, target_id).json()
+    request = fake_llm.last_request
+    result = summary(client, owner, target_id)
+
+    assert_summary_matches_qa_context(result, request, target_id)
+    assert result["review_count"] == answer["review_count"] == 4
+    assert result["average_rating"] == 3.0
+    assert supplied_review_ids(request) == listable_review_ids(client, owner, target_id)
+    assert_not_in_context(request, "Not a rating", "Broken")
+
+
+def test_summary_and_qa_follow_the_active_target_together(client, fake_llm, as_user):
+    owner = as_user()
+    battery = create_target(client, owner, "Phone store")
+    service = create_target(client, owner, "Call center")
+    ingest(client, owner, battery, BATTERY_CSV)
+    ingest(client, owner, service, SERVICE_CSV)
+
+    for target_id, expected_count in ((battery, 3), (service, 2), (battery, 3)):
+        ask(client, owner, target_id)
+        result = summary(client, owner, target_id)
+
+        assert result["review_count"] == expected_count
+        assert_summary_matches_qa_context(result, fake_llm.last_request, target_id)
+
+
+def test_target_without_persisted_reviews_has_no_summary_or_qa_dataset(
+    client, fake_llm, as_user
+):
+    owner = as_user()
+    target_id = create_target(client, owner, "New store")
+    empty = {"target_id": target_id, "review_count": 0, "average_rating": None}
+
+    for upload in (None, "rating,review_text\n9,Out of range rating"):
+        if upload:
+            assert ingest(client, owner, target_id, upload)["state"] == "failed"
+        answer = ask(client, owner, target_id).json()
+
+        assert summary(client, owner, target_id) == empty
+        assert (answer["status"], answer["review_count"]) == ("no_reviews", 0)
+    assert fake_llm.requests == []

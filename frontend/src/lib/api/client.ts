@@ -26,11 +26,23 @@ export interface IngestionResultResponse {
   message: string
 }
 
+export interface ReviewSummaryResponse {
+  target_id: string
+  review_count: number
+  average_rating: number | null
+}
+
 export async function getWorkspace(base: string, targetId: string, token: string) {
   const path = `/${encodeURIComponent(targetId)}`
   const target = await targetRequest<WorkspaceTargetResponse>(base, path, token)
   const result = await targetRequest<IngestionResultResponse | null>(base, `${path}/ingestions/latest`, token)
   return { target, result }
+}
+
+export function getReviewSummary(base: string, targetId: string, token: string) {
+  return targetRequest<ReviewSummaryResponse>(
+    base, `/${encodeURIComponent(targetId)}/reviews/summary`, token,
+  )
 }
 
 export function uploadReviews(base: string, targetId: string, token: string, csvText: string) {

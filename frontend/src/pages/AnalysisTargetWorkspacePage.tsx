@@ -1,15 +1,16 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { useParams } from 'react-router'
 import { AppShell } from '../components/layout/AppShell'
 import { Alert } from '../components/ui/Alert'
-import { AnalysisTargetWorkspaceView, type AnalysisTargetWorkspaceState } from '../components/workspace/AnalysisTargetWorkspaceView'
-import { ApiError, getWorkspace, uploadReviews, type IngestionResultResponse } from '../lib/api/client'
+import { AnalysisTargetWorkspaceView, type AnalysisTargetWorkspaceState, type ReviewSummaryState } from '../components/workspace/AnalysisTargetWorkspaceView'
+import { ApiError, getReviewSummary, getWorkspace, uploadReviews, type IngestionResultResponse } from '../lib/api/client'
 import { useAuth } from '../lib/auth/AuthContext'
 import { MESSAGES } from '../lib/messages'
 
 function Workspace({ apiBaseUrl, targetId, token }: { apiBaseUrl: string; targetId: string; token: string }) {
   const { expireSession } = useAuth()
   const [state, setState] = useState<AnalysisTargetWorkspaceState>({ kind: 'loading' })
+  const [summary, setSummary] = useState<ReviewSummaryState>({ kind: 'loading' })
   const [result, setResult] = useState<IngestionResultResponse | null>(null)
   const [attempt, setAttempt] = useState(0)
   const [file, setFile] = useState<File | null>(null)
@@ -17,7 +18,30 @@ function Workspace({ apiBaseUrl, targetId, token }: { apiBaseUrl: string; target
   const [busy, setBusy] = useState(false)
   const mounted = useRef(false)
   const uploading = useRef(false)
+  const summaryRequestId = useRef(0)
   const fileInput = useRef<HTMLInputElement>(null)
+
+  const refreshSummary = useCallback(async () => {
+    const requestId = ++summaryRequestId.current
+    setSummary({ kind: 'loading' })
+    try {
+      const next = await getReviewSummary(apiBaseUrl, targetId, token)
+      if (!mounted.current || requestId !== summaryRequestId.current) return
+      setSummary({ kind: 'ready', summary: next })
+    } catch (failure) {
+      if (!mounted.current || requestId !== summaryRequestId.current) return
+      if (failure instanceof ApiError && failure.status === 401) {
+        void expireSession().catch(() => {})
+      } else if (failure instanceof ApiError && [403, 404].includes(failure.status)) {
+        setState({ kind: 'missing' })
+      } else {
+        setSummary({
+          kind: 'error',
+          message: failure instanceof ApiError ? MESSAGES.unexpected : MESSAGES.offline,
+        })
+      }
+    }
+  }, [apiBaseUrl, targetId, token, expireSession])
 
   function handleFailure(failure: unknown, submission = false) {
     if (failure instanceof ApiError && failure.status === 401) {
@@ -45,6 +69,7 @@ function Workspace({ apiBaseUrl, targetId, token }: { apiBaseUrl: string; target
           name: target.name, platform: target.platform === 'google_maps' ? 'Google Maps' : target.platform,
           sourceReference: target.source_url, latestIngestionState: latest?.state,
         } })
+        void refreshSummary()
       })
       .catch((failure: unknown) => {
         if (!active) return
@@ -56,8 +81,12 @@ function Workspace({ apiBaseUrl, targetId, token }: { apiBaseUrl: string; target
           setState({ kind: 'error', message: failure instanceof ApiError ? MESSAGES.unexpected : MESSAGES.offline })
         }
       })
-    return () => { active = false; mounted.current = false }
-  }, [apiBaseUrl, targetId, token, expireSession, attempt])
+    return () => {
+      active = false
+      mounted.current = false
+      summaryRequestId.current += 1
+    }
+  }, [apiBaseUrl, targetId, token, expireSession, attempt, refreshSummary])
 
   async function submit(event: FormEvent) {
     event.preventDefault()
@@ -77,6 +106,7 @@ function Workspace({ apiBaseUrl, targetId, token }: { apiBaseUrl: string; target
       if (!mounted.current) return
       setResult(next)
       setState({ kind: 'ready', target: { ...state.target, latestIngestionState: next.state } })
+      if (next.state === 'succeeded') void refreshSummary()
     } catch (failure) {
       if (mounted.current) handleFailure(failure, true)
     } finally {
@@ -94,7 +124,7 @@ function Workspace({ apiBaseUrl, targetId, token }: { apiBaseUrl: string; target
   }
 
   return <>
-    <AnalysisTargetWorkspaceView state={state}>
+    <AnalysisTargetWorkspaceView state={state} summary={summary} onRetrySummary={() => void refreshSummary()}>
       <section className="workspace-ingestion" aria-live="polite">
         <h2>Ingest reviews</h2>
         <p className="muted">{MESSAGES.ingestionUnavailable}</p>

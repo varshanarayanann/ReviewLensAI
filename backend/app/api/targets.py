@@ -4,7 +4,7 @@ from uuid import UUID, uuid4
 import fastapi
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user
@@ -17,6 +17,7 @@ from app.schemas import target_list
 from app.schemas.analysis_target import AnalysisTargetCreate, AnalysisTargetRead
 from app.schemas.ingestion_result import IngestionResult
 from app.schemas.review import ReviewResponse
+from app.schemas.review_summary import ReviewSummary
 
 router = APIRouter(prefix="/api/targets", dependencies=[Depends(get_current_user)])
 logger = logging.getLogger(__name__)
@@ -49,6 +50,25 @@ def list_reviews(
         .limit(limit)
         .offset(offset)
     ).all()
+
+
+@router.get("/{target_id}/reviews/summary", response_model=ReviewSummary)
+def review_summary(
+    target_id: UUID,
+    user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    target = owned(target_id, user, db)
+    review_count, average_rating = db.execute(
+        select(func.count(Review.id), func.avg(Review.rating)).where(
+            Review.target_id == target.id
+        )
+    ).one()
+    return ReviewSummary(
+        target_id=target.id,
+        review_count=review_count,
+        average_rating=average_rating,
+    )
 
 
 @router.post("", status_code=201)

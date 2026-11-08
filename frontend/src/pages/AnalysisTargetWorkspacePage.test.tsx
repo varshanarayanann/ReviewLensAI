@@ -258,6 +258,7 @@ it('restores a failed ingestion result after refreshing the workspace', async ()
     persisted_count: 0,
     message: 'Reviews could not be collected. Try again shortly.',
   }
+  const summary = { target_id: target.id, review_count: 0, average_rating: null }
 
   let saved = false
 
@@ -268,7 +269,9 @@ it('restores a failed ingestion result after refreshing the workspace', async ()
     }
 
     return Promise.resolve(
-      json(url.endsWith('/latest') ? (saved ? failed : null) : target),
+      json(url.endsWith('/latest')
+        ? (saved ? failed : null)
+        : url.endsWith('/reviews/summary') ? summary : target),
     )
   })
 
@@ -284,6 +287,8 @@ it('restores a failed ingestion result after refreshing the workspace', async ()
 
   expect(await screen.findByText(failed.message)).toBeInTheDocument()
   expect(screen.getByText('Failed')).toBeInTheDocument()
+  expect(screen.getByText('0 reviews')).toBeInTheDocument()
+  expect(screen.getByText('No ratings yet')).toBeInTheDocument()
 })
 
 it('blocks duplicate imports while a submission is pending', async () => {

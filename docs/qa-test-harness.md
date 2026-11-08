@@ -70,11 +70,13 @@ SQLite and PostgreSQL.
 | Missing or invalid login | `401` | No |
 | Provider fails or is not configured | `503`, safe message; question and reviews are not logged | Yes |
 
-The prompt wording and the "send every review of the target" context strategy
-are deliberately simple starting points. S2-013 owns the final system prompt,
-S2-010 the context strategy and size limits, S2-020 the empty-target experience,
-and S2-009 the UI. When changing them, keep the boundary contract and update the
-orchestration tests.
+S2-010 now supplies the complete owned dataset within a 1,000-review and
+64,000-byte JSON context budget, otherwise returning safe 422 without a model
+call. See [the architecture decision](qa-context-design.md). S2-012 clarifies
+absent evidence in the prompt; S2-016/S2-019 add cross-user and stale-context
+regressions in `tests/test_qa_context.py`. S2-013 owns broader prompt work,
+S2-020 the empty-target experience and S2-009 the UI. Preserve the boundary
+contract and update orchestration tests when changing these pieces.
 
 ## Adding a real provider
 
@@ -85,6 +87,10 @@ A provider adapter is a class with a `complete(request)` method, passed to
 - Return `parse_model_reply(raw_text)` so the reply follows the prompt's JSON format.
 - Convert every provider error and timeout into `LLMUnavailableError`.
 - Never log the question, review text, or answer.
+- Use independent calls without shared conversation/history or previous-response
+  IDs. Treat supplied reviews and target names as data, not system instructions.
+- Check the model's actual token budget, including framing and output capacity;
+  never silently truncate the complete review context.
 - Be unit tested with a mocked HTTP transport or SDK, never a live call in CI.
 
 Live-model checks (for example the S2-004 evaluation set against a real model)

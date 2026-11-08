@@ -344,3 +344,13 @@ No LLM provider is configured yet, so the running app returns 503 for questions.
 Tests replace the model with a recording fake, so CI needs no API key. See
 [the Q&A test harness](docs/qa-test-harness.md) for the model boundary, how to
 write Q&A tests, and what a real provider adapter must do.
+
+### Review context limits and isolation (S2-010/012/016/019)
+
+Q&A uses every persisted review for the authorized target, within a limit of
+1,000 reviews and 64,000 UTF-8 bytes of compact JSON review records. Oversized
+datasets return safe HTTP 422 before the model is called; no sampling or silent
+truncation occurs. Context is rebuilt on every request and contains no prior
+target's history. Insufficient evidence is reported explicitly instead of
+inferred from general knowledge. See [the research and architecture decision](docs/qa-context-design.md)
+for limits, provider requirements and deterministic acceptance coverage.

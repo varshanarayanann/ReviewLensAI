@@ -252,6 +252,11 @@ a {
   background: var(--color-success-bg);
 }
 
+.alert--warning {
+  color: var(--color-warning);
+  background: var(--color-warning-bg);
+}
+
 .alert--info {
   color: var(--color-info);
   background: var(--color-info-bg);

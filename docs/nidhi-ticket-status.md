@@ -1,4 +1,75 @@
-# Nidhi's Sprint 1 delivery and blockers
+# Nidhi ticket delivery — 2026-11-07
+
+Current baseline: `main` at `df5ffc3`. Assigned open issues were verified through
+GitHub on 2026-11-07. Changes are implemented on `nidhi/sprint2-review-context`
+and await PR review/merge; GitHub issues remain open until merge.
+
+| Ticket | Delivery |
+| --- | --- |
+| #55 / S2-010 | Complete persisted context with owner/target filtering, stable ordering, 1,000-row and 64,000-byte JSON limits; overflow fails before the model. |
+| #57 / S2-012 | Explicit absent-versus-negative evidence instructions and a controlled parking-safety test against food/service reviews. |
+| #61 / S2-016 | Same-client account transitions, spoofed owner inputs, direct helper filtering, and indistinguishable foreign/missing target errors tested at the model boundary. |
+| #64 / S2-019 | Fresh column reads, immutable request context, stateless adapter contract, A → B → empty → A after failure, and committed update/deletion tests. |
+| #10, #16, #23 | Already closed and implemented on main; existing backend regression coverage passed in this run. |
+
+[Execution plan and research](qa-context-design.md) records the alternatives,
+primary sources, architectural decision, limits and remaining provider/UI work.
+`AGENTS.md` now starts with an authoritative current-state update; the old
+research inventory below it is explicitly historical.
+
+## Local verification
+
+- Python 3.14.4, dependencies installed from committed backend manifests in a
+  temporary virtual environment outside the repository; no manifest changes.
+- Ruff check and format check passed (57 files).
+- Compileall and application import smoke checks passed.
+- Full backend suite: **262 passed, 97 skipped**. All skips are PostgreSQL
+  variants because no disposable PostgreSQL server is configured locally.
+- Backend changed-code coverage: **100%** (27 measured executable lines),
+  above the required 80%; overall backend coverage 98%.
+- `git diff --check` passed.
+- No frontend code changes; local frontend tests were not rerun (Node absent).
+  PR CI supplies Node 22, Python 3.12 and PostgreSQL 18 for full verification.
+- No live Supabase or model calls, schema changes, deployments or secret changes.
+  Mocked replies establish orchestration behavior, not live-model reliability.
+
+## Publication blocker
+
+Branch commits are local and reviewable. Publishing was attempted, but Git HTTPS
+has no credentials in this environment and the connected GitHub integration
+returned HTTP 403 (`Resource not accessible by integration`) for Git object
+creation. No remote branch, PR, issue closure or CI run was created.
+
+After restoring repository write access, publish with:
+
+```bash
+git push -u origin nidhi/sprint2-review-context
+```
+
+Open a PR into `main` referencing `Closes #55`, `Closes #57`, `Closes #61`, and
+`Closes #64`, include this validation/AI assistance record, and obtain the
+required human/security review. CI must verify PostgreSQL and frontend checks
+before merge. Do not describe local implementation as merged delivery.
+
+## AI assistance record
+
+The user requested: “complete all the tickets assigned to nidhisakpal,” first
+planning and researching implementation, then completing each ticket and updating
+the agent guide. Codex assisted with issue/source inspection, primary-source
+research, bounded context retrieval, evidence instructions, regression tests and
+documentation. The diff was reviewed and the commands above were executed.
+The PR must receive normal human review and additional security review under
+`AI_ASSISTED_DEVELOPMENT.md` before merge. This sanitized task-and-verification
+summary records the material assistance without retaining raw session logs.
+
+---
+
+## Historical Sprint 1 delivery record
+
+The dated record below is retained for provenance; its branch states and blockers
+are superseded by current source and the update above.
+
+### Nidhi's Sprint 1 delivery and blockers
 
 Updated 2026-11-02. Implementation PR #28 is merged into main. S1-010 and S1-016 are closed. S1-023 acceptance verification is complete for the implemented CSV ingestion path; see the verification addendum below.
 

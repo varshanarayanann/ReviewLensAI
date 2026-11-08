@@ -35,7 +35,10 @@ it('shows the name, platform, source, and workspace link from the owned target r
     headers: { Authorization: 'Bearer test-access-token' },
   })
   fetchMock.mockImplementation((url: string) => Promise.resolve(json(
-    url.endsWith('/latest') ? null : target,
+    url.endsWith('/latest') ? null
+      : url.endsWith('/reviews/summary')
+        ? { target_id: target.id, review_count: 0, average_rating: null }
+        : target,
   )))
   fireEvent.click(link)
   expect(await screen.findByRole('heading', { name: target.name })).toBeInTheDocument()

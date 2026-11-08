@@ -1,5 +1,67 @@
 # ReviewLens AI — Project Context and Agent Guide
 
+## Current implementation and task update — 2026-11-07
+
+**Read this section first.** The numbered research snapshot below is historical
+(2026-11-01/02); its inventories, branch/PR states and missing-feature claims are
+not current. This section supersedes those claims. Preserve its engineering and
+security rules, but verify implementation against source before starting work.
+
+Baseline inspected: `main` at `df5ffc3` (PR #67 merged). GitHub search found no
+open PRs at task start. Assigned Sprint 1 tickets #10, #16 and #23 are closed and
+implemented. Nidhi's open Sprint 2 tickets are #55, #57, #61 and #64; their changes
+are on `nidhi/sprint2-review-context`, pending PR review/merge, not released main.
+
+### Present on baseline main
+
+- Target creation, listing, read, review listing, CSV ingestion and latest-run
+  APIs exist under `backend/app/api/targets.py`, with parent ownership checks.
+- Models and SQL migrations for targets, reviews and ingestion runs exist.
+  SQLite and disposable PostgreSQL variants exercise the real workflow.
+- Dashboard, target creation and analysis workspace routes exist. Workspace
+  status comes from persisted results; CSV import is implemented. Automatic
+  collection from Google Maps URLs remains unimplemented.
+- `POST /api/targets/{target_id}/questions` exists with verified ownership,
+  persisted review retrieval and an injectable `LLMClient`. Outcomes are
+  `answered`, `insufficient_evidence`, `out_of_scope`, and `no_reviews`.
+- `UnconfiguredLLMClient` remains the default: nonempty Q&A returns safe 503
+  until a real provider is integrated. An empty target returns `no_reviews`
+  without calling the model. There is no Q&A frontend in this baseline.
+- Engineering/security/AI-assisted development guidance, deterministic Q&A
+  harness, scope evaluation and the changed-code coverage gate are committed.
+  Read `AI_ASSISTED_DEVELOPMENT.md`; PRs need an AI assistance record and human
+  review, plus security review for these context/ownership changes.
+
+### Changes for #55, #57, #61 and #64
+
+- `backend/app/qa/context.py` loads columns through an owner-and-target-scoped
+  join on every request. No cached context, history, vector index or previous
+  response is used. Stable review UUID order and immutable context are retained.
+- Context includes all persisted reviews or rejects the request: at most 1,000
+  records and 64,000 UTF-8 bytes of compact JSON review records including IDs,
+  rating and text. Overflow returns safe 422 before invoking the model. Never
+  silently select the first N reviews or truncate text to fit.
+- This byte budget is not a model-token guarantee. Provider adapters must check
+  their serialized input plus question, instructions and output allowance;
+  fail safely if their model window is insufficient. Adapters must be stateless,
+  with no shared provider conversations or previous-response identifiers.
+- The prompt distinguishes missing evidence from negative evidence and treats
+  review text/target names as untrusted data. SQL enforces isolation independently
+  of the prompt. Controlled replies verify insufficient-evidence handling;
+  they do not establish real-model factual accuracy or injection immunity.
+- `backend/tests/test_qa_context.py` covers boundaries, absent parking evidence,
+  spoofed ownership, same-client account transitions, target switching after
+  failure, empty targets, and updated/deleted rows with stale ORM entities.
+- Architecture research, alternatives, execution sequence, and limitations:
+  [Q&A context design](docs/qa-context-design.md). Delivery/test evidence:
+  [Nidhi ticket status](docs/nidhi-ticket-status.md).
+
+Run backend checks from `backend/`: Ruff check/format, compile/import smoke,
+`python -m pytest -ra --cov --cov-report=xml --cov-report=term`, then
+`diff-cover coverage.xml --compare-branch=origin/main --fail-under=80`.
+PostgreSQL tests need `TEST_POSTGRES_URL` for a disposable server; do not point
+it at production. No schema migration or provider credential is added here.
+
 ## 1. Scope, evidence, and how to use this file
 
 This guide applies to the entire ReviewLens AI repository. Read it before changing code, then read the active story and relevant source files. Keep it current when architecture, commands, contracts, or scope change.

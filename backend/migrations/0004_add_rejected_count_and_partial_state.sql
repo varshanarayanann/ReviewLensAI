@@ -23,8 +23,7 @@ BEGIN
 
     IF state_attnum IS NULL OR COALESCE(array_length(state_constraints, 1), 0) <> 1 THEN
         RAISE EXCEPTION
-            'Expected exactly one CHECK constraint on ingestion_runs.state; found %',
-            COALESCE(array_length(state_constraints, 1), 0);
+            'Expected exactly one CHECK constraint on ingestion_runs.state';
     END IF;
 
     SELECT pg_get_expr(conbin, conrelid)
@@ -33,18 +32,13 @@ BEGIN
     WHERE conrelid = 'public.ingestion_runs'::regclass
       AND conname = state_constraints[1];
 
-    expected_table_name := format(
-        '_expected_ingestion_state_%s_%s',
-        pg_backend_pid(),
-        txid_current()
-    );
-    EXECUTE format(
-        'CREATE TEMPORARY TABLE %I (
+    expected_table_name := '_expected_ingestion_state_'
+        || pg_backend_pid()::TEXT || '_' || txid_current()::TEXT;
+    EXECUTE
+        'CREATE TEMPORARY TABLE ' || quote_ident(expected_table_name) || ' (
             state VARCHAR(16) NOT NULL
                 CHECK (state IN (''processing'', ''succeeded'', ''failed''))
-        ) ON COMMIT DROP',
-        expected_table_name
-    );
+        ) ON COMMIT DROP';
 
     SELECT oid
     INTO expected_table_oid
@@ -63,10 +57,8 @@ BEGIN
             'ingestion_runs.state CHECK does not match the expected original restriction';
     END IF;
 
-    EXECUTE format(
-        'ALTER TABLE public.ingestion_runs DROP CONSTRAINT %I',
-        state_constraints[1]
-    );
+    EXECUTE 'ALTER TABLE public.ingestion_runs DROP CONSTRAINT '
+        || quote_ident(state_constraints[1]);
 
     EXECUTE
         'ALTER TABLE public.ingestion_runs
@@ -74,7 +66,7 @@ BEGIN
             CONSTRAINT ingestion_runs_rejected_count_check
                 CHECK (rejected_count >= 0)';
 
-    EXECUTE format('DROP TABLE pg_temp.%I', expected_table_name);
+    EXECUTE 'DROP TABLE pg_temp.' || quote_ident(expected_table_name);
 
     ALTER TABLE public.ingestion_runs
         ADD CONSTRAINT ingestion_runs_state_check

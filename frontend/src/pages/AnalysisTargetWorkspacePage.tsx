@@ -98,7 +98,11 @@ function Workspace({ apiBaseUrl, targetId, token }: { apiBaseUrl: string; target
       <section className="workspace-ingestion" aria-live="polite">
         <h2>Ingest reviews</h2>
         <p className="muted">{MESSAGES.ingestionUnavailable}</p>
-        {result && <Alert variant={result.state === 'failed' ? 'danger' : result.state === 'processing' ? 'info' : 'success'}>{result.message}</Alert>}
+        {result && <Alert variant={
+          result.state === 'failed' ? 'danger'
+            : result.state === 'partial' ? 'warning'
+              : result.state === 'processing' ? 'info' : 'success'
+        }>{result.message}</Alert>}
         <h3>Upload a CSV</h3>
         <p id="csv-help" className="muted">{MESSAGES.csvRecovery}</p>
         <form className="form" onSubmit={submit} noValidate>

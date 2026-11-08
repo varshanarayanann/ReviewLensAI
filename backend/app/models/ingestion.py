@@ -1,7 +1,17 @@
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, Uuid, func
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    Uuid,
+    func,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -9,10 +19,26 @@ from app.models.base import Base
 
 class IngestionRun(Base):
     __tablename__ = "ingestion_runs"
+    __table_args__ = (
+        CheckConstraint(
+            "state IN ('processing', 'succeeded', 'partial', 'failed')",
+            name="ingestion_runs_state_check",
+        ),
+        CheckConstraint(
+            "persisted_count >= 0", name="ingestion_runs_persisted_count_check"
+        ),
+        CheckConstraint(
+            "rejected_count >= 0", name="ingestion_runs_rejected_count_check"
+        ),
+    )
+
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     target_id: Mapped[UUID] = mapped_column(ForeignKey("analysis_targets.id"))
     state: Mapped[str] = mapped_column(String(16), default="processing")
     persisted_count: Mapped[int] = mapped_column(Integer, default=0)
+    rejected_count: Mapped[int] = mapped_column(
+        Integer, default=0, server_default=text("0")
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

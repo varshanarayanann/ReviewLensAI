@@ -62,6 +62,7 @@ def test_each_user_can_submit_only_to_their_existing_target(
         outcome = response.json()
         assert outcome["target_id"] == target
         assert outcome["state"] == "succeeded" and outcome["persisted_count"] == 1
+        assert outcome["rejected_count"] == 0
         with Session(database) as db:
             run = db.get(IngestionRun, UUID(outcome["run_id"]))
             review = db.scalar(select(Review).where(Review.run_id == run.id))
@@ -204,3 +205,21 @@ def test_maximum_review_count_is_accepted(client, database, source_targets):
     assert response.status_code == 200
     assert response.json()["state"] == "succeeded"
     assert response.json()["persisted_count"] == 1000
+    assert response.json()["rejected_count"] == 0
+
+
+def test_route_keeps_decimal_form_ratings_invalid(client, database, source_targets):
+    headers, target = source_targets[0]
+    response = client.post(
+        f"/api/targets/{target}/ingestions",
+        headers=headers,
+        json={"csv_text": "rating,review_text\n5,Valid integer\n5.0,Decimal form"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["state"] == "partial"
+    assert response.json()["persisted_count"] == 1
+    assert response.json()["rejected_count"] == 1
+    with Session(database) as db:
+        rows = db.scalars(select(Review)).all()
+    assert [(row.rating, row.review_text) for row in rows] == [(5, "Valid integer")]

@@ -129,6 +129,8 @@ def test_uploaded_csv_is_retrievable_as_the_persisted_dataset(
 
     assert result["state"] == "succeeded"
     assert result["persisted_count"] == len(BATTERY_DATASET)
+    assert result["rejected_count"] == 0
+    assert result["message"] == "Imported 3 reviews; rejected 0 records."
     assert dataset(client, owner, target_id) == BATTERY_DATASET
     rows = review_rows(client, owner, target_id)
     assert {row["run_id"] for row in rows} == {result["run_id"]}
@@ -167,27 +169,34 @@ def test_switching_targets_returns_only_the_selected_dataset(client, as_user):
     assert latest(client, owner, battery) == battery_result
 
 
-def test_rejected_upload_rows_never_enter_the_dataset(client, database, as_user):
+def test_partially_rejected_upload_persists_only_valid_rows(client, database, as_user):
     owner = as_user()
     target_id = create_target(client, owner, "Phone store")
     ingest(client, owner, target_id, BATTERY_CSV)
 
-    rejected = ingest(
+    partial = ingest(
         client,
         owner,
         target_id,
         "rating,review_text\n5,Looks valid but shares a file\nnot-a-number,Broken",
     )
 
-    assert rejected["state"] == "failed"
-    assert rejected["persisted_count"] == 0
-    assert latest(client, owner, target_id) == rejected
-    assert dataset(client, owner, target_id) == BATTERY_DATASET
+    assert partial["state"] == "partial"
+    assert partial["persisted_count"] == 1
+    assert partial["rejected_count"] == 1
+    assert partial["message"] == "Imported 1 review; rejected 1 record."
+    assert latest(client, owner, target_id) == partial
+    assert dataset(client, owner, target_id) == sorted(
+        BATTERY_DATASET + [(5, "Looks valid but shares a file")]
+    )
     with Session(database) as db:
-        run = db.get(IngestionRun, UUID(rejected["run_id"]))
-        leaked = db.scalars(select(Review).where(Review.run_id == run.id)).all()
-    assert run.state == "failed"
-    assert leaked == []
+        run = db.get(IngestionRun, UUID(partial["run_id"]))
+        stored = db.scalars(select(Review).where(Review.run_id == run.id)).all()
+    assert run.state == "partial"
+    assert run.persisted_count == 1 and run.rejected_count == 1
+    assert [(review.rating, review.review_text) for review in stored] == [
+        (5, "Looks valid but shares a file")
+    ]
 
 
 @pytest.mark.parametrize("suffix", ["", "/reviews", "/ingestions/latest"])
@@ -225,23 +234,27 @@ def test_qa_context_is_the_same_dataset_the_user_can_list(client, fake_llm, as_u
     )
 
 
-def test_new_uploads_reach_qa_and_rejected_uploads_do_not(client, fake_llm, as_user):
+def test_partial_uploads_reach_qa_only_for_persisted_reviews(client, fake_llm, as_user):
     owner = as_user()
     target_id = create_target(client, owner, "Phone store")
     ingest(client, owner, target_id, BATTERY_CSV)
     ask(client, owner, target_id)
     before = supplied_texts(fake_llm.last_request)
 
-    rejected = ingest(
+    partial = ingest(
         client,
         owner,
         target_id,
         "rating,review_text\n5,Looks valid but shares a file\nnot-a-number,Broken",
     )
-    assert rejected["state"] == "failed"
+    assert partial["state"] == "partial"
+    assert partial["persisted_count"] == 1
+    assert partial["rejected_count"] == 1
     ask(client, owner, target_id)
-    assert supplied_texts(fake_llm.last_request) == before
-    assert_not_in_context(fake_llm.last_request, "Looks valid", "Broken")
+    assert supplied_texts(fake_llm.last_request) == before | {
+        "Looks valid but shares a file"
+    }
+    assert_not_in_context(fake_llm.last_request, "Broken")
 
     ingest(client, owner, target_id, "rating,review_text\n4,Battery swap was free")
     ask(client, owner, target_id)

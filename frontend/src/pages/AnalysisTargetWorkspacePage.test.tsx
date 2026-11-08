@@ -86,7 +86,10 @@ it('ends the session on a rejected workspace request', async () => {
 })
 
 it.each([
-  ['processing', 'Ingesting'], ['succeeded', 'Ingested'], ['failed', 'Failed'],
+  ['processing', 'Ingesting'],
+  ['succeeded', 'Ingested'],
+  ['partial', 'Partially ingested'],
+  ['failed', 'Failed'],
 ])('restores persisted ingestion state %s', async (state, label) => {
   fetchMock.mockImplementation((url: string) => Promise.resolve(json(url.endsWith('/latest')
     ? { ...succeeded, state, message: 'Recorded result', persisted_count: state === 'succeeded' ? 1 : 0 } : target)))
@@ -151,6 +154,41 @@ it('keeps the authorized target context on a failed import', async () => {
   expect(await screen.findByText('Failed')).toBeInTheDocument()
   expect(screen.getByRole('heading', { name: target.name })).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Upload reviews' })).toBeEnabled()
+})
+
+it('restores a failed ingestion result after refreshing the workspace', async () => {
+  const failed = {
+    ...succeeded,
+    state: 'failed',
+    persisted_count: 0,
+    message: 'Reviews could not be collected. Try again shortly.',
+  }
+
+  let saved = false
+
+  fetchMock.mockImplementation((url: string, options?: RequestInit) => {
+    if (options?.method === 'POST') {
+      saved = true
+      return Promise.resolve(json(failed))
+    }
+
+    return Promise.resolve(
+      json(url.endsWith('/latest') ? (saved ? failed : null) : target),
+    )
+  })
+
+  showWorkspace()
+  await screen.findByRole('heading', { name: target.name })
+
+  chooseFile()
+  fireEvent.click(screen.getByRole('button', { name: 'Upload reviews' }))
+
+  expect(await screen.findByText('Failed')).toBeInTheDocument()
+
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh workspace' }))
+
+  expect(await screen.findByText(failed.message)).toBeInTheDocument()
+  expect(screen.getByText('Failed')).toBeInTheDocument()
 })
 
 it('blocks duplicate imports while a submission is pending', async () => {

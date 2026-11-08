@@ -20,7 +20,9 @@ it('maps backend validation failures and preserves input', async () => {
 it('restores a recorded failed ingestion with target context', async () => {
   vi.stubGlobal('fetch', vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(
     url.endsWith('/latest') ? { state: 'failed', persisted_count: 0, message: 'Reviews could not be collected. Try again shortly.' }
-      : { id: 'target-id', name: 'Example business', platform: 'google_maps', source_url: 'https://google.com/maps/place/X' },
+      : url.endsWith('/reviews/summary')
+        ? { target_id: 'target-id', review_count: 0, average_rating: null }
+        : { id: 'target-id', name: 'Example business', platform: 'google_maps', source_url: 'https://google.com/maps/place/X' },
   )))))
   render(<MemoryRouter initialEntries={['/targets/target-id']}><App config={config} authClient={createFakeAuth(fakeSession()).client} /></MemoryRouter>)
   expect(await screen.findByRole('alert')).toHaveTextContent('Try again')
@@ -30,7 +32,9 @@ it('restores a recorded failed ingestion with target context', async () => {
 it('opens the workspace for a newly created target', async () => {
   vi.stubGlobal('fetch', vi.fn((url: string, options?: RequestInit) => Promise.resolve(new Response(JSON.stringify(
     options?.method === 'POST' ? { id: 'created-target' } : url.endsWith('/latest') ? null
-      : { id: 'created-target', name: 'Created business', platform: 'google_maps', source_url: 'https://google.com/maps/place/X' },
+      : url.endsWith('/reviews/summary')
+        ? { target_id: 'created-target', review_count: 0, average_rating: null }
+        : { id: 'created-target', name: 'Created business', platform: 'google_maps', source_url: 'https://google.com/maps/place/X' },
   )))))
   render(<MemoryRouter initialEntries={['/targets/new']}><App config={config} authClient={createFakeAuth(fakeSession()).client} /></MemoryRouter>)
   await screen.findByRole('heading', { name: 'Create target' })

@@ -1,4 +1,9 @@
 export const MESSAGES = {
+  questionRequired: 'Enter a question about the reviews.',
+  questionTooLong: 'Use 1,000 characters or fewer.',
+  questionUnavailable: 'ReviewLens could not answer right now. Try again shortly.',
+  questionCannotProcess: 'ReviewLens could not process this question. Try a shorter question or a target with fewer reviews.',
+  questionNoReviews: 'This target has no saved reviews. Upload reviews before asking a question.',
   targetNotFound: "We couldn't find that analysis target. It may have been deleted, or you may not have access to it.",
   targetSwitchUnavailable: 'Could not load your analysis targets. Try again.',
   noOtherTargets: 'You have no other analysis targets. Add one from the dashboard.',

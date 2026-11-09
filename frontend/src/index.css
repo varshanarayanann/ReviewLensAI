@@ -349,7 +349,8 @@ a {
   background: var(--color-neutral-bg);
 }
 
-.workspace-ingestion {
+.workspace-ingestion,
+.workspace-questions {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -357,15 +358,33 @@ a {
   width: 100%;
 }
 
-.workspace-ingestion h2 {
+.workspace-ingestion h2,
+.workspace-questions h2 {
   margin: 0;
   font-size: 20px;
   line-height: 28px;
 }
 
-.workspace-ingestion h3 { margin: 0; font-size: 16px; line-height: 24px; }
-.workspace-ingestion .form { width: 100%; max-width: 560px; }
+.workspace-ingestion h3,
+.workspace-questions h3 { margin: 0; font-size: 16px; line-height: 24px; }
+.workspace-ingestion .form,
+.workspace-questions .form { width: 100%; max-width: 560px; }
 .workspace-ingestion input[type='file'] { width: 100%; min-width: 0; font: inherit; }
+.workspace-questions textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  resize: vertical;
+}
+.workspace-questions textarea[aria-invalid='true'] { border-color: var(--color-danger); }
+.workspace-questions textarea:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.workspace-questions [aria-live] { width: 100%; min-width: 0; }
+.workspace-answer { white-space: pre-wrap; overflow-wrap: anywhere; }
 .workspace-refresh { margin-top: var(--space-4); }
 
 @media (min-width: 768px) and (max-width: 1023px) {
@@ -379,10 +398,11 @@ a {
   .account-menu__email { max-width: 25vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .account-menu .button { white-space: nowrap; flex-shrink: 0; min-height: 44px; }
   .workspace-details { padding: var(--space-4); }
-  .workspace-ingestion .button, .workspace-refresh { min-height: 44px; }
+  .workspace-ingestion .button, .workspace-questions .button, .workspace-refresh { min-height: 44px; }
 }
 
-.workspace-ingestion p {
+.workspace-ingestion p,
+.workspace-questions p {
   margin: 0;
 }
 

@@ -4,6 +4,7 @@ import { AppShell } from '../components/layout/AppShell'
 import { Alert } from '../components/ui/Alert'
 import { ReviewQuestionPanel } from '../components/workspace/ReviewQuestionPanel'
 import { AnalysisTargetWorkspaceView, type AnalysisTargetWorkspaceState, type ReviewSummaryState } from '../components/workspace/AnalysisTargetWorkspaceView'
+import { WorkspaceTargetSwitcher } from '../components/workspace/WorkspaceTargetSwitcher'
 import { ApiError, getReviewSummary, getWorkspace, uploadReviews, type IngestionResultResponse } from '../lib/api/client'
 import { useAuth } from '../lib/auth/AuthContext'
 import { MESSAGES } from '../lib/messages'
@@ -125,6 +126,7 @@ function Workspace({ apiBaseUrl, targetId, token }: { apiBaseUrl: string; target
   }
 
   return <>
+    {state.kind === 'ready' && <WorkspaceTargetSwitcher apiBaseUrl={apiBaseUrl} targetId={targetId} token={token} />}
     <AnalysisTargetWorkspaceView state={state} summary={summary} onRetrySummary={() => void refreshSummary()}>
       {state.kind === 'ready' && <ReviewQuestionPanel apiBaseUrl={apiBaseUrl} targetId={targetId}
         targetName={state.target.name} token={token} onAccessDenied={() => setState({ kind: 'missing' })} />}

@@ -9,7 +9,6 @@ const answerTitles = {
   answered: 'ReviewLens response',
   insufficient_evidence: 'Not enough evidence',
   out_of_scope: 'Outside review scope',
-  no_reviews: 'No saved reviews',
 }
 
 interface ReviewQuestionPanelProps {
@@ -31,6 +30,10 @@ export function ReviewQuestionPanel({ apiBaseUrl, targetId, targetName, token, o
   const request = useRef<AbortController | null>(null)
 
   useEffect(() => () => request.current?.abort(), [])
+
+  if (answer?.status === 'no_reviews') {
+    return <p aria-live="polite" className="muted">{MESSAGES.questionNoReviews}</p>
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -74,8 +77,7 @@ export function ReviewQuestionPanel({ apiBaseUrl, targetId, targetName, token, o
   }
 
   return (
-    <section className="workspace-questions" aria-labelledby="review-questions-title">
-      <h2 id="review-questions-title">Ask about reviews</h2>
+    <>
       <form className="form" onSubmit={submit} noValidate>
         <label htmlFor="review-question">Question *</label>
         <p id="review-question-help" className="muted">
@@ -95,9 +97,9 @@ export function ReviewQuestionPanel({ apiBaseUrl, targetId, targetName, token, o
         {busy && <p className="muted">ReviewLens is preparing a response.</p>}
         {answer && <>
           <h3>{answerTitles[answer.status]}</h3>
-          <p className="workspace-answer">{answer.status === 'no_reviews' ? MESSAGES.questionNoReviews : answer.answer}</p>
+          <p className="workspace-answer">{answer.answer}</p>
         </>}
       </div>
-    </section>
+    </>
   )
 }

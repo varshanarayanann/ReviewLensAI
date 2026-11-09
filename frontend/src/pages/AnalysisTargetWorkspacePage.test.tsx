@@ -3,6 +3,7 @@ import { Link, MemoryRouter } from 'react-router'
 import { beforeEach, expect, it, vi } from 'vitest'
 import App from '../App'
 import { AnalysisTargetWorkspaceView } from '../components/workspace/AnalysisTargetWorkspaceView'
+import type { ReviewSummaryResponse } from '../lib/api/client'
 import { MESSAGES } from '../lib/messages'
 import { createFakeAuth, fakeSession } from '../test/fakeAuth'
 
@@ -12,13 +13,14 @@ const succeeded = { run_id: 'run-a', target_id: target.id, state: 'succeeded', p
 const partial = { run_id: 'run-partial', target_id: target.id, state: 'partial', persisted_count: 2, rejected_count: 1, message: 'Imported 2 reviews; rejected 1 record.' }
 const rejected = { run_id: 'run-rejected', target_id: target.id, state: 'failed', persisted_count: 0, rejected_count: 3, message: 'Imported 0 reviews; rejected 3 records. Check the review text and ratings.' }
 const persistenceFailure = { run_id: 'run-failure', target_id: target.id, state: 'failed', persisted_count: 0, rejected_count: 0, message: 'Reviews could not be collected. Try again shortly.' }
-const emptySummary = { target_id: target.id, review_count: 0, average_rating: null }
+const emptySummary: ReviewSummaryResponse = { target_id: target.id, review_count: 0, average_rating: null }
+const populatedSummary = { target_id: target.id, review_count: 2, average_rating: 4 }
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status })
 let fetchMock: ReturnType<typeof vi.fn>
 
-function defaultResponse(url: string) {
+function defaultResponse(url: string, summary = emptySummary) {
   if (url.endsWith('/latest')) return null
-  if (url.endsWith('/reviews/summary')) return emptySummary
+  if (url.endsWith('/reviews/summary')) return summary
   return target
 }
 
@@ -57,7 +59,7 @@ it('asks about the active target and displays its response after processing', as
   let complete!: (response: Response) => void
   const pending = new Promise<Response>((resolve) => { complete = resolve })
   fetchMock.mockImplementation((url: string) => url === questionsUrl
-    ? pending : Promise.resolve(json(defaultResponse(url))))
+    ? pending : Promise.resolve(json(defaultResponse(url, populatedSummary))))
   showWorkspace()
   const input = await enterQuestion('  What did reviewers like?  ')
   fireEvent.click(screen.getByRole('button', { name: 'Ask question' }))
@@ -82,6 +84,7 @@ it.each([
   ['   ', MESSAGES.questionRequired],
   ['a'.repeat(1001), MESSAGES.questionTooLong],
 ])('rejects an invalid question before sending it (%#)', async (question, message) => {
+  fetchMock.mockImplementation((url: string) => Promise.resolve(json(defaultResponse(url, populatedSummary))))
   showWorkspace()
   const input = await enterQuestion(question)
   fireEvent.click(screen.getByRole('button', { name: 'Ask question' }))
@@ -96,7 +99,7 @@ it.each([
   [0, MESSAGES.offline],
 ])('shows safe feedback for a failed question (%s) and preserves it for retry', async (status, message) => {
   fetchMock.mockImplementation((url: string) => {
-    if (url !== questionsUrl) return Promise.resolve(json(defaultResponse(url)))
+    if (url !== questionsUrl) return Promise.resolve(json(defaultResponse(url, populatedSummary)))
     if (status === 0) return Promise.reject(new TypeError('private failure details'))
     return Promise.resolve(json({ detail: 'private failure details' }, status))
   })
@@ -110,24 +113,35 @@ it.each([
 })
 
 it.each([
-  ['no_reviews', null, MESSAGES.questionNoReviews],
   ['insufficient_evidence', 'The reviews do not mention that.', 'The reviews do not mention that.'],
   ['out_of_scope', 'Ask about the active reviews.', 'Ask about the active reviews.'],
 ])('displays the backend %s outcome', async (status, text, expected) => {
   fetchMock.mockImplementation((url: string) => Promise.resolve(json(url === questionsUrl
-    ? { ...answer, status, answer: text, review_count: text === null ? 0 : 2 }
-    : defaultResponse(url))))
+    ? { ...answer, status, answer: text }
+    : defaultResponse(url, populatedSummary))))
   showWorkspace()
   await enterQuestion()
   fireEvent.click(screen.getByRole('button', { name: 'Ask question' }))
   expect(await screen.findByText(expected)).toBeInTheDocument()
 })
 
+it('hides Q&A when the server reports the previously loaded review count is stale', async () => {
+  fetchMock.mockImplementation((url: string) => Promise.resolve(json(url === questionsUrl
+    ? { ...answer, status: 'no_reviews', answer: null, review_count: 0 }
+    : defaultResponse(url, populatedSummary))))
+  showWorkspace()
+  await enterQuestion()
+  fireEvent.click(screen.getByRole('button', { name: 'Ask question' }))
+  expect(await screen.findByText(MESSAGES.questionNoReviews)).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Ask question' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('heading', { name: 'ReviewLens response' })).not.toBeInTheDocument()
+})
+
 it.each([[401, 'Log in'], [404, 'Analysis target not found']])(
   'uses existing workspace access handling for a Q&A %s',
   async (status, heading) => {
     fetchMock.mockImplementation((url: string) => Promise.resolve(url === questionsUrl
-      ? json({ detail: 'private failure details' }, status) : json(defaultResponse(url))))
+      ? json({ detail: 'private failure details' }, status) : json(defaultResponse(url, populatedSummary))))
     showWorkspace()
     await enterQuestion()
     fireEvent.click(screen.getByRole('button', { name: 'Ask question' }))
@@ -142,7 +156,7 @@ it('discards a pending question when the active target changes', async () => {
   fetchMock.mockImplementation((url: string) => {
     if (url === questionsUrl) return pending
     if (url.endsWith('/target-b')) return Promise.resolve(json({ ...target, id: 'target-b', name: 'Second Cafe' }))
-    return Promise.resolve(json(defaultResponse(url)))
+    return Promise.resolve(json(defaultResponse(url, populatedSummary)))
   })
   showWorkspace()
   await enterQuestion()
@@ -151,7 +165,53 @@ it('discards a pending question when the active target changes', async () => {
   expect(await screen.findByRole('heading', { name: 'Second Cafe' })).toBeInTheDocument()
   await act(async () => complete(json(answer)))
   expect(screen.queryByText(answer.answer)).not.toBeInTheDocument()
-  expect(screen.getByRole('textbox', { name: 'Question *' })).toHaveValue('')
+  expect(await screen.findByRole('textbox', { name: 'Question *' })).toHaveValue('')
+})
+
+it.each([[null, 'Not ingested'], [persistenceFailure, 'Failed']])(
+  'guides the user to import reviews for an empty target (%#)',
+  async (latest, badge) => {
+    fetchMock.mockImplementation((url: string) => Promise.resolve(json(url.endsWith('/latest')
+      ? latest : defaultResponse(url))))
+    showWorkspace()
+    expect(await screen.findByText(MESSAGES.questionNoReviews)).toBeInTheDocument()
+    expect(screen.getByText(badge)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Upload reviews' })).toBeEnabled()
+    expect(screen.queryByRole('textbox', { name: 'Question *' })).not.toBeInTheDocument()
+    expect(fetchMock.mock.calls.some(([url]) => url === questionsUrl)).toBe(false)
+  },
+)
+
+it('enables Q&A once the first successful import updates the persisted summary', async () => {
+  let imported = false
+  fetchMock.mockImplementation((url: string, options?: RequestInit) => {
+    if (url.endsWith('/ingestions') && options?.method === 'POST') {
+      imported = true
+      return Promise.resolve(json(succeeded))
+    }
+    if (url === questionsUrl) {
+      return Promise.resolve(json({ ...answer, review_count: 1 }))
+    }
+    return Promise.resolve(json(defaultResponse(url, imported
+      ? { target_id: target.id, review_count: 1, average_rating: 5 } : emptySummary)))
+  })
+  showWorkspace()
+  expect(await screen.findByText(MESSAGES.questionNoReviews)).toBeInTheDocument()
+  chooseFile()
+  fireEvent.click(screen.getByRole('button', { name: 'Upload reviews' }))
+  await enterQuestion()
+  fireEvent.click(screen.getByRole('button', { name: 'Ask question' }))
+  expect(await screen.findByText(answer.answer)).toBeInTheDocument()
+  expect(screen.queryByText(MESSAGES.questionNoReviews)).not.toBeInTheDocument()
+})
+
+it('keeps Q&A available if the latest import failed but previous reviews remain', async () => {
+  fetchMock.mockImplementation((url: string) => Promise.resolve(json(url.endsWith('/latest')
+    ? persistenceFailure : defaultResponse(url, populatedSummary))))
+  showWorkspace()
+  expect(await screen.findByText('Failed')).toBeInTheDocument()
+  expect(await screen.findByRole('button', { name: 'Ask question' })).toBeEnabled()
+  expect(screen.queryByText(MESSAGES.questionNoReviews)).not.toBeInTheDocument()
 })
 
 it('requires authentication before loading any target data', async () => {
@@ -200,6 +260,8 @@ it('shows a loading state while the review summary is pending', async () => {
 
   expect(await screen.findByRole('heading', { name: target.name })).toBeInTheDocument()
   expect(screen.getAllByText('Loading...')).toHaveLength(2)
+  expect(screen.getByText(MESSAGES.questionCheckingReviews)).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Ask question' })).not.toBeInTheDocument()
 })
 
 it('shows a safe summary error and retries the request', async () => {
@@ -216,6 +278,8 @@ it('shows a safe summary error and retries the request', async () => {
   showWorkspace()
 
   expect(await screen.findByRole('alert')).toHaveTextContent(MESSAGES.unexpected)
+  expect(screen.getByText(MESSAGES.questionReviewCheckFailed)).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Ask question' })).not.toBeInTheDocument()
   expect(screen.queryByText('sensitive backend details')).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Retry review summary' }))
 

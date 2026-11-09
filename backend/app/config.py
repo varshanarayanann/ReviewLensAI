@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     cors_origins: Annotated[list[str], NoDecode] = Field(min_length=1)
     supabase_url: str = Field(pattern=r"^https?://[^\s/]+")
     supabase_publishable_key: str = Field(min_length=1)
+    openai_api_key: SecretStr | None = None
 
     @field_validator("cors_origins", mode="before")
     @classmethod
@@ -36,6 +37,13 @@ class Settings(BaseSettings):
         if value.strip().startswith("sb_secret_"):
             raise ValueError("use the publishable key, not a secret key")
         return value.strip()
+
+    @field_validator("openai_api_key")
+    @classmethod
+    def reject_empty_openai_api_key(cls, value: SecretStr | None) -> SecretStr | None:
+        if value is not None and not value.get_secret_value().strip():
+            raise ValueError("must not be empty")
+        return value
 
     @property
     def supabase_auth_issuer(self) -> str:

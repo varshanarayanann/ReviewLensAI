@@ -241,6 +241,7 @@ The committed `.env.example` files list every required name. Never commit secret
 | `CORS_ORIGINS` | Yes | Comma-separated frontend origins allowed to call the API, e.g. `http://localhost:5173` |
 | `SUPABASE_URL` | Yes | Supabase project URL, e.g. `https://<project-ref>.supabase.co`. Used to fetch the public keys that verify login tokens |
 | `SUPABASE_PUBLISHABLE_KEY` | Yes | Supabase publishable (or anon) key, the same public value as `VITE_SUPABASE_ANON_KEY`. Used to confirm with Supabase Auth that a login session is still active, so a token stops working as soon as its user logs out. The backend refuses an `sb_secret_` key here |
+| `OPENAI_API_KEY` | No | **Secret.** Enables review-grounded Q&A through OpenAI's Responses API. Without it, nonempty Q&A returns a safe 503. Set it only in `backend/.env`; review content is sent to OpenAI when a question is asked |
 | `REVIEW_PROVIDER_API_KEY` | Future URL integration | Reserved server-side secret placeholder; not read by Settings or required for the S1-020 CSV import path |
 | `REVIEW_MAX_PER_RUN` | Future URL integration | Reserved provider cap; current CSV imports use a fixed maximum of 1,000 records |
 

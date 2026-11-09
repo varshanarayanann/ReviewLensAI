@@ -1,6 +1,6 @@
 # ReviewLens AI — Project Context and Agent Guide
 
-## Current implementation and task update — 2026-11-07
+## Current implementation and task update — 2026-11-09
 
 **Read this section first.** The numbered research snapshot below is historical
 (2026-11-01/02); its inventories, branch/PR states and missing-feature claims are
@@ -55,6 +55,19 @@ are on `nidhi/sprint2-review-context`, pending PR review/merge, not released mai
 - Architecture research, alternatives, execution sequence, and limitations:
   [Q&A context design](docs/qa-context-design.md). Delivery/test evidence:
   [Nidhi ticket status](docs/nidhi-ticket-status.md).
+
+### S2-011 review-grounded answers (local implementation)
+
+- `backend/app/qa/prompt.py` guides direct evidence-based synthesis, cautious
+  recurrence claims, use of ratings, and balanced treatment of disagreement.
+- `backend/app/qa/openai_provider.py` sends the active question and persisted
+  reviews as JSON data to the OpenAI Responses API using `gpt-5.6-terra` when
+  `OPENAI_API_KEY` is set. Calls are stateless, disable response storage,
+  enforce a conservative input budget, and map provider/format failures to safe
+  service errors. The key is optional; without it Q&A remains safely unavailable.
+- Deterministic adapter tests and the manual scope evaluation do not prove live
+  answer quality. Set a server-side key and run the evaluation before making
+  quality claims. No UI was added; S2-009 covers the interface.
 
 Run backend checks from `backend/`: Ruff check/format, compile/import smoke,
 `python -m pytest -ra --cov --cov-report=xml --cov-report=term`, then

@@ -28,11 +28,16 @@ reviews do and do not contain.
 | `in_scope` | `answered` | 3 | Complaint summary, praised food, and a question where reviews disagree. |
 | `insufficient_evidence` | `insufficient_evidence` | 3 | Parking, accessibility, vegan options: relevant to a diner, absent from the reviews. |
 | `general_knowledge` | `out_of_scope` | 3 | Weather, a coding task, a world fact. |
-| `other_entity` | `out_of_scope` | 3 | Another business, a comparison naming the active target, the same brand in another city. |
-| `other_platform` | `out_of_scope` | 3 | Yelp, a TripAdvisor-vs-Google comparison, Amazon. |
+| `other_entity` | `out_of_scope` | 5 | Another business, a comparison naming the active target, the same brand in another city, an indirect nearby-business recommendation, a cross-entity/platform comparison. |
+| `other_platform` | `out_of_scope` | 4 | Yelp, a TripAdvisor-vs-Google comparison, Amazon, an indirect Yelp-vs-Google comparison. |
 
 Each case has a `note` explaining why it is in the set. Prefer replacing a weak
 case over adding a near-duplicate.
+
+The prompt permits comparisons only when the active supplied reviews contain
+the evidence required for every entity and platform in the comparison. Otherwise
+the response must be `out_of_scope`; general knowledge or assumed access to
+other review sources is not a substitute.
 
 ## Reply format and grading
 
@@ -48,11 +53,14 @@ A reply is **acceptable** when:
 2. Its `answer` is not empty.
 3. For `answered` cases, the answer mentions at least one of the case's
    `evidence_terms`, which are themes that really appear in the reviews.
+4. For `out_of_scope` cases, the refusal identifies the review scope rather
+   than giving a generic refusal with no explanation.
 
 Wording is free: "Long waits on weekends" and "the kitchen is slow" both pass the
-complaint question, and any phrasing of a refusal passes an out-of-scope case.
-The API returns the outcome as `status`, so the UI can show a refusal or a
-missing-evidence message distinctly (S2-BR-021).
+complaint question, and refusals may use different wording as long as they make
+clear that ReviewLens answers about the supplied reviews. The prompt invites the
+user to ask about those reviews instead. The API returns the outcome as `status`,
+so the UI can show a refusal or a missing-evidence message distinctly (S2-BR-021).
 
 Provider adapters call `parse_model_reply` on the raw model text. A reply that is
 not valid JSON in this shape is treated as a failed model call (503), never shown
@@ -73,21 +81,21 @@ model or API key:
   (S2-BR-019, S2-BR-020).
 - The system prompt names the target and platform and defines all three outcomes.
 - The grader accepts varied acceptable wording and rejects wrong outcomes,
-  ungrounded answers, and empty answers. The runner reports model failures.
+  ungrounded answers, generic out-of-scope refusals, and empty answers. The
+  runner reports model failures.
 
 ## Running against a real model (manual)
 
-This supplements the CI checks and never replaces them (S2-BR-031). Once the team
-adds a provider adapter, run from `backend/` with the virtual environment active
-and the provider key in `backend/.env`:
+This supplements the CI checks and never replaces them (S2-BR-031). Run from
+`backend/` with the virtual environment active and `OPENAI_API_KEY` set in
+`backend/.env`:
 
 ```powershell
-python -m evals.scope_eval --client <module>:<factory>
+python -m evals.scope_eval --client app.qa.openai_provider:create_client
 ```
 
-`<factory>` is a function returning the adapter, for example
-`app.qa.providers.openai:create_client`. The run makes one model call per case
-(15 calls) and prints one line per case plus totals by category:
+The evaluation makes one model call per case (18 calls) and prints one line per
+case plus totals by category:
 
 ```text
 PASS  in-01  in_scope               acceptable

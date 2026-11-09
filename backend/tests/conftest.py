@@ -62,6 +62,7 @@ def isolated_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         "CORS_ORIGINS",
         "SUPABASE_URL",
         "SUPABASE_PUBLISHABLE_KEY",
+        "OPENAI_API_KEY",
     ):
         monkeypatch.delenv(name, raising=False)
 

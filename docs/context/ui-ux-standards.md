@@ -167,6 +167,11 @@ The workspace is the most important screen. It always contains, in this order:
 
 Sprint 1 rule: render **only the Reviews tab**. When only one tab exists, the tab bar may be hidden. Do not show disabled or "coming soon" Summary/Ask tabs, chart placeholders, or a chat box in Sprint 1.
 
+**S2-009:** The current workspace presents Q&A in an inline **Ask about reviews**
+panel under the target details alongside the existing summary and ingestion
+controls. It submits one question to `POST /api/targets/{id}/questions`, shows
+progress and the current response, and keeps the question available for retry.
+
 **Reviews tab layout (Sprint 1):**
 
 1. **Ingestion panel**: latest ingestion state, the primary `Ingest reviews` action (from the source URL), the secondary `Upload a CSV instead` action, and the result message of the latest attempt.

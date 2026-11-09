@@ -1,5 +1,12 @@
 # ReviewLens AI — Project Context and Agent Guide
 
+## S2-009 workspace Q&A
+
+The analysis workspace uses the existing authenticated questions endpoint via
+the typed API client. The panel displays one response at a time, handles all
+four response statuses, and discards pending responses when the workspace
+unmounts. Live answers require a configured backend model provider.
+
 ## Current implementation and task update — 2026-11-07
 
 **Read this section first.** The numbered research snapshot below is historical

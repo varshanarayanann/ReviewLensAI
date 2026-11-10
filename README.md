@@ -341,7 +341,12 @@ model's outcome: `answered`, `insufficient_evidence`, or `out_of_scope`.
 representative questions for each scope category, checked in CI without a model
 and runnable against a real model with `python -m evals.scope_eval`.
 
-No LLM provider is configured yet, so the running app returns 503 for questions.
+The analysis workspace includes an **Ask about reviews** panel for one question
+and response at a time. It uses the active target and shows a distinct result
+when no saved reviews are available.
+
+The default backend has no live LLM provider, so questions on targets with
+reviews return 503 until a provider is configured.
 Tests replace the model with a recording fake, so CI needs no API key. See
 [the Q&A test harness](docs/qa-test-harness.md) for the model boundary, how to
 write Q&A tests, and what a real provider adapter must do.

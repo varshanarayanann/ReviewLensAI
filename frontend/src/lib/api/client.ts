@@ -33,6 +33,19 @@ export interface ReviewSummaryResponse {
   average_rating: number | null
 }
 
+export interface ReviewAnswerResponse {
+  target_id: string
+  status: 'answered' | 'insufficient_evidence' | 'out_of_scope' | 'no_reviews'
+  answer: string | null
+  review_count: number
+}
+
+export function askReviewQuestion(base: string, targetId: string, token: string, question: string, signal: AbortSignal) {
+  return targetRequest<ReviewAnswerResponse>(
+    base, `/${encodeURIComponent(targetId)}/questions`, token, { question }, signal,
+  )
+}
+
 export async function getWorkspace(base: string, targetId: string, token: string) {
   const path = `/${encodeURIComponent(targetId)}`
   const target = await targetRequest<WorkspaceTargetResponse>(base, path, token)
@@ -93,10 +106,11 @@ export async function getCurrentUser(
   return (await response.json()) as CurrentUserResponse
 }
 
-export async function targetRequest<T>(base: string, path: string, token: string, body?: unknown): Promise<T> {
+export async function targetRequest<T>(base: string, path: string, token: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   const response = await fetch(`${base}/api/targets${path}`, {
     method: body === undefined ? 'GET' : 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    ...(signal ? { signal } : {}),
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   })
   if (!response.ok) throw new ApiError(response.status)

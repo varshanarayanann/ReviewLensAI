@@ -42,6 +42,118 @@ function chooseFile(name = 'reviews.csv', contents = 'rating,review_text\n5,Grea
   return file
 }
 
+const questionsUrl = 'http://api.test/api/targets/target-a/questions'
+const answer = {
+  target_id: target.id, status: 'answered', answer: 'Reviewers liked the coffee.', review_count: 2,
+}
+
+async function enterQuestion(question = 'What did reviewers like?') {
+  const input = await screen.findByRole('textbox', { name: 'Question *' })
+  fireEvent.change(input, { target: { value: question } })
+  return input
+}
+
+it('asks about the active target and displays its response after processing', async () => {
+  let complete!: (response: Response) => void
+  const pending = new Promise<Response>((resolve) => { complete = resolve })
+  fetchMock.mockImplementation((url: string) => url === questionsUrl
+    ? pending : Promise.resolve(json(defaultResponse(url))))
+  showWorkspace()
+  const input = await enterQuestion('  What did reviewers like?  ')
+  fireEvent.click(screen.getByRole('button', { name: 'Ask question' }))
+
+  expect(screen.getByRole('heading', { name: target.name })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Asking...' })).toBeDisabled()
+  expect(screen.getByText('ReviewLens is preparing a response.')).toBeInTheDocument()
+  fireEvent.submit(input.closest('form')!)
+  expect(fetchMock.mock.calls.filter(([url]) => url === questionsUrl)).toHaveLength(1)
+  expect(fetchMock).toHaveBeenCalledWith(questionsUrl, expect.objectContaining({
+    method: 'POST',
+    headers: expect.objectContaining({ Authorization: 'Bearer test-access-token' }),
+    body: JSON.stringify({ question: 'What did reviewers like?' }),
+  }))
+
+  complete(json(answer))
+  expect(await screen.findByText(answer.answer)).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Ask question' })).toBeEnabled()
+})
+
+it.each([
+  ['   ', MESSAGES.questionRequired],
+  ['a'.repeat(1001), MESSAGES.questionTooLong],
+])('rejects an invalid question before sending it (%#)', async (question, message) => {
+  showWorkspace()
+  const input = await enterQuestion(question)
+  fireEvent.click(screen.getByRole('button', { name: 'Ask question' }))
+  expect(screen.getByText(message)).toBeInTheDocument()
+  expect(input).toHaveFocus()
+  expect(fetchMock.mock.calls.some(([url]) => url === questionsUrl)).toBe(false)
+})
+
+it.each([
+  [503, MESSAGES.questionUnavailable],
+  [422, MESSAGES.questionCannotProcess],
+  [0, MESSAGES.offline],
+])('shows safe feedback for a failed question (%s) and preserves it for retry', async (status, message) => {
+  fetchMock.mockImplementation((url: string) => {
+    if (url !== questionsUrl) return Promise.resolve(json(defaultResponse(url)))
+    if (status === 0) return Promise.reject(new TypeError('private failure details'))
+    return Promise.resolve(json({ detail: 'private failure details' }, status))
+  })
+  showWorkspace()
+  const input = await enterQuestion()
+  fireEvent.click(screen.getByRole('button', { name: 'Ask question' }))
+  expect(await screen.findByText(message)).toBeInTheDocument()
+  expect(screen.queryByText('private failure details')).not.toBeInTheDocument()
+  expect(input).toHaveValue('What did reviewers like?')
+  expect(screen.getByRole('button', { name: 'Ask question' })).toBeEnabled()
+})
+
+it.each([
+  ['no_reviews', null, MESSAGES.questionNoReviews],
+  ['insufficient_evidence', 'The reviews do not mention that.', 'The reviews do not mention that.'],
+  ['out_of_scope', 'Ask about the active reviews.', 'Ask about the active reviews.'],
+])('displays the backend %s outcome', async (status, text, expected) => {
+  fetchMock.mockImplementation((url: string) => Promise.resolve(json(url === questionsUrl
+    ? { ...answer, status, answer: text, review_count: text === null ? 0 : 2 }
+    : defaultResponse(url))))
+  showWorkspace()
+  await enterQuestion()
+  fireEvent.click(screen.getByRole('button', { name: 'Ask question' }))
+  expect(await screen.findByText(expected)).toBeInTheDocument()
+})
+
+it.each([[401, 'Log in'], [404, 'Analysis target not found']])(
+  'uses existing workspace access handling for a Q&A %s',
+  async (status, heading) => {
+    fetchMock.mockImplementation((url: string) => Promise.resolve(url === questionsUrl
+      ? json({ detail: 'private failure details' }, status) : json(defaultResponse(url))))
+    showWorkspace()
+    await enterQuestion()
+    fireEvent.click(screen.getByRole('button', { name: 'Ask question' }))
+    expect(await screen.findByRole('heading', { name: heading })).toBeInTheDocument()
+    expect(screen.queryByRole('textbox', { name: 'Question *' })).not.toBeInTheDocument()
+  },
+)
+
+it('discards a pending question when the active target changes', async () => {
+  let complete!: (response: Response) => void
+  const pending = new Promise<Response>((resolve) => { complete = resolve })
+  fetchMock.mockImplementation((url: string) => {
+    if (url === questionsUrl) return pending
+    if (url.endsWith('/target-b')) return Promise.resolve(json({ ...target, id: 'target-b', name: 'Second Cafe' }))
+    return Promise.resolve(json(defaultResponse(url)))
+  })
+  showWorkspace()
+  await enterQuestion()
+  fireEvent.click(screen.getByRole('button', { name: 'Ask question' }))
+  fireEvent.click(screen.getByRole('link', { name: 'Open another target' }))
+  expect(await screen.findByRole('heading', { name: 'Second Cafe' })).toBeInTheDocument()
+  await act(async () => complete(json(answer)))
+  expect(screen.queryByText(answer.answer)).not.toBeInTheDocument()
+  expect(screen.getByRole('textbox', { name: 'Question *' })).toHaveValue('')
+})
+
 it('requires authentication before loading any target data', async () => {
   showWorkspace('/targets/target-a', createFakeAuth())
   expect(await screen.findByRole('heading', { name: 'Log in' })).toBeInTheDocument()

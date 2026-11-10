@@ -128,6 +128,14 @@ def grade(case: EvalCase, response: LLMResponse) -> Grade:
         return Grade(False, "empty answer")
     if case.evidence_terms and not any(term in answer for term in case.evidence_terms):
         return Grade(False, "answer mentions no theme that appears in the reviews")
+    if response.outcome is ReplyOutcome.OUT_OF_SCOPE and not (
+        "review" in answer
+        and any(
+            phrase in answer
+            for phrase in ("these", "supplied", "google maps", "reviewlens", "only")
+        )
+    ):
+        return Grade(False, "refusal does not clarify ReviewLens review scope")
     return Grade(True, "acceptable")
 
 

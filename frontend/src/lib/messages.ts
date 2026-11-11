@@ -7,6 +7,8 @@ export const MESSAGES = {
   questionCheckingReviews: 'Checking for saved reviews…',
   questionReviewCheckFailed: 'Could not check for saved reviews. Retry the review summary to ask a question.',
   targetNotFound: "We couldn't find that analysis target. It may have been deleted, or you may not have access to it.",
+  targetSwitchUnavailable: 'Could not load your analysis targets. Try again.',
+  noOtherTargets: 'You have no other analysis targets. Add one from the dashboard.',
   csvFile: 'Choose a CSV file smaller than 1 MB.',
   csvFormat: 'Check that your CSV has rating and review_text columns and is smaller than 1 MB.',
   csvRecovery: 'Upload reviews from a CSV with rating and review_text columns. Ratings must be integers from 1 to 5. Maximum 1,000 reviews. Invalid rows reject the entire import; existing reviews are retained.',

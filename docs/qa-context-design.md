@@ -36,12 +36,14 @@ target. A budget overflow returns safe HTTP 422 and makes no model call. Existin
 reviews remain available; nothing is deleted to fit the budget. This is a
 conservative application payload limit, not a measured model token limit.
 
-Question length remains limited to 1,000 characters. System instructions,
-question, provider message framing and output tokens are additional overhead.
-A future provider adapter must count its actual serialized input using its
-model's tokenizer and reserve output capacity; it must fail safely when its
-window is too small. Do not silently truncate or equate characters/bytes with
-tokens. There is no configured production model or paid API call in this work.
+Question length remains limited to 1,000 characters. The OpenAI adapter uses
+`gpt-5.6-terra`, enforces an 800,000-token input budget using the UTF-8 byte
+length of its serialized system prompt and evidence (a conservative upper
+bound), reserves 10,000 tokens for API framing, and requests at most 2,048
+output tokens. The model's documented maximum input is 922,000 tokens. The
+adapter rejects over-budget inputs rather than silently truncating them.
+If the model or request construction changes, revisit the budget and reserve.
+No provider credential or live model call is included in deterministic tests.
 
 ## Retrieval and trust boundary
 
@@ -84,6 +86,6 @@ hard-code a parking keyword detector or fabricate evidence verification.
 
 Deterministic tests capture actual requests and script outcomes; they prove
 context isolation and response handling, not live-model factual reliability.
-The existing scope evaluation includes absent-evidence cases and can be run
-manually with a future configured provider. No provider adapter or Q&A UI is
-introduced by these four backend tickets; those remain separate team work.
+The scope evaluation includes supported and absent-evidence cases and can be run
+manually against the configured OpenAI adapter. The Q&A UI remains separate
+work under S2-009.

@@ -111,6 +111,14 @@
       "note": "Same brand, different location that the dataset does not represent."
     },
     {
+      "id": "oe-04",
+      "category": "other_entity",
+      "question": "Would I have a better brunch at the diner across the street?",
+      "expected_outcome": "out_of_scope",
+      "not_in_dataset": ["across the street"],
+      "note": "Indirectly asks for a recommendation based on an unrepresented business."
+    },
+    {
       "id": "op-01",
       "category": "other_platform",
       "question": "What are Maple Street Diner's Yelp reviews like?",
@@ -133,6 +141,22 @@
       "expected_outcome": "out_of_scope",
       "not_in_dataset": ["amazon", "hot sauce"],
       "note": "Different platform and a product the reviews never mention."
+    },
+    {
+      "id": "op-04",
+      "category": "other_platform",
+      "question": "Compared with its Yelp reputation, do these Google Maps reviews look more positive?",
+      "expected_outcome": "out_of_scope",
+      "not_in_dataset": ["yelp"],
+      "note": "A comparison is requested, but the active dataset contains no Yelp evidence."
+    },
+    {
+      "id": "oe-05",
+      "category": "other_entity",
+      "question": "How does Maple Street Diner compare with Broad Street Grill on Amazon?",
+      "expected_outcome": "out_of_scope",
+      "not_in_dataset": ["broad street grill", "amazon"],
+      "note": "Comparison requires both another business and an unsupported platform."
     }
   ]
 }

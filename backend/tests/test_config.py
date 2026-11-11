@@ -100,6 +100,20 @@ def test_supabase_auth_urls_are_derived_from_project_url() -> None:
     )
 
 
+def test_openai_key_is_optional_and_redacted() -> None:
+    settings = settings_with(openai_api_key="sk-test-key")
+
+    assert settings.openai_api_key.get_secret_value() == "sk-test-key"
+    assert "sk-test-key" not in repr(settings)
+
+
+def test_empty_openai_key_is_rejected_without_echoing_value() -> None:
+    with pytest.raises(ConfigurationError, match="OPENAI_API_KEY") as exc_info:
+        settings_with(openai_api_key=" ")
+
+    assert "must not be empty" not in str(exc_info.value)
+
+
 @pytest.mark.parametrize(
     ("url", "expected"),
     [

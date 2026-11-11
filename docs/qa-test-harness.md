@@ -16,7 +16,7 @@ Rules: S2-BR-009 through S2-BR-014, S2-BR-022, S2-BR-027 through S2-BR-031.
 | System prompt | `backend/app/qa/prompt.py` | `build_system_prompt(target)`; names the target and platform and states the scope rules. |
 | Orchestration | `backend/app/qa/service.py` | `answer_question(...)` loads the owner's target and its persisted reviews, then calls the client. |
 | Endpoint | `POST /api/targets/{target_id}/questions` | `backend/app/api/questions.py` |
-| Injection | `create_app(..., llm_client=...)` | Production defaults to `UnconfiguredLLMClient` until a provider adapter is added. |
+| Injection | `create_app(..., llm_client=...)` | An explicit client overrides configuration; otherwise `OPENAI_API_KEY` enables `OpenAIReviewLLM`, and no key leaves the safe unconfigured client in place. |
 | Fake model | `backend/tests/qa_harness.py` | `FakeLLMClient` records every request and returns scripted replies. |
 
 Reviews cross the boundary as structured records rather than a pre-rendered
@@ -61,6 +61,13 @@ SQLite and PostgreSQL.
 
 ## Current behavior
 
+For supported questions, the system prompt directs the model to synthesize
+across relevant reviews, treat a theme as recurring only when multiple reviews
+support it, use ratings when relevant, and reflect conflicting experiences.
+It prohibits invented counts and unsupported causal claims. The request keeps
+ratings and review text structured so provider adapters can supply both as
+evidence.
+
 | Situation | Response | Model called? |
 | --- | --- | --- |
 | Owned target with reviews | `200 {target_id, status, answer, review_count}`; `status` is the model's outcome: `answered`, `insufficient_evidence`, or `out_of_scope` | Yes |
@@ -70,28 +77,34 @@ SQLite and PostgreSQL.
 | Missing or invalid login | `401` | No |
 | Provider fails or is not configured | `503`, safe message; question and reviews are not logged | Yes |
 
-S2-010 now supplies the complete owned dataset within a 1,000-review and
-64,000-byte JSON context budget, otherwise returning safe 422 without a model
-call. See [the architecture decision](qa-context-design.md). S2-012 clarifies
-absent evidence in the prompt; S2-016/S2-019 add cross-user and stale-context
-regressions in `tests/test_qa_context.py`. S2-013 owns broader prompt work,
-S2-020 the empty-target experience and S2-009 the UI. Preserve the boundary
-contract and update orchestration tests when changing these pieces.
+S2-010 supplies the complete owned dataset within a 1,000-review and 64,000-byte
+JSON context budget, otherwise returning safe 422 without a model call. See
+[the architecture decision](qa-context-design.md). S2-012 clarifies absent
+evidence; S2-016/S2-019 add cross-user and stale-context regressions in
+`tests/test_qa_context.py`. S2-020 covers the empty-target experience and S2-009
+the UI. Preserve the boundary contract and update orchestration tests when
+changing these pieces.
 
-## Adding a real provider
+## OpenAI provider
 
-A provider adapter is a class with a `complete(request)` method, passed to
-`create_app` as `llm_client` in production. It must:
+`backend/app/qa/openai_provider.py` implements the provider-neutral `LLMClient`
+boundary with OpenAI's Responses API and `gpt-5.6-terra`. The backend activates
+it only when the server-side `OPENAI_API_KEY` is configured; otherwise the
+existing safe 503 behavior remains. Calls are stateless, disable response
+storage, use a 30-second timeout with SDK retries disabled, preserve the
+system prompt separately from JSON-serialized question/review evidence, and
+require JSON output parsed by `parse_model_reply`. The adapter checks the
+serialized prompt and input against a conservative 800,000-token input budget
+before calling the API. Its UTF-8 byte count upper-bounds text token count, with
+10,000 tokens reserved for API framing.
 
-- Keep its API key in `backend/.env` only (add the name to `.env.example`).
-- Return `parse_model_reply(raw_text)` so the reply follows the prompt's JSON format.
-- Convert every provider error and timeout into `LLMUnavailableError`.
-- Never log the question, review text, or answer.
-- Use independent calls without shared conversation/history or previous-response
-  IDs. Treat supplied reviews and target names as data, not system instructions.
-- Check the model's actual token budget, including framing and output capacity;
-  never silently truncate the complete review context.
-- Be unit tested with a mocked HTTP transport or SDK, never a live call in CI.
+Set `OPENAI_API_KEY` in `backend/.env` to enable it locally. Do not send real
+review data to a provider unless the deployment's data-handling requirements
+permit it. Provider failures and malformed replies become
+`LLMUnavailableError`; the API logs only the target ID and error class, never
+the question, reviews, or answer. The model's reported behavior still requires
+live evaluation: mocked provider tests establish request shape and failure
+handling, not factual accuracy or prompt-injection immunity.
 
 Live-model checks (for example the S2-004 evaluation set against a real model)
 may supplement these tests, but they must run manually outside CI and do not

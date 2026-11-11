@@ -3,6 +3,7 @@
 from uuid import UUID, uuid4
 
 import pytest
+from pydantic import SecretStr
 
 from app.main import create_app
 from app.models.analysis_target import AnalysisTarget, ReviewPlatform
@@ -13,6 +14,7 @@ from app.qa.llm import (
     ReplyOutcome,
     UnconfiguredLLMClient,
 )
+from app.qa.openai_provider import OpenAIReviewLLM
 from app.qa.prompt import build_system_prompt
 from tests.conftest import USER_A_ID
 from tests.qa_harness import (
@@ -235,3 +237,21 @@ def test_app_without_a_configured_provider_refuses_to_answer(settings, token_ver
         app.state.llm_client.complete(
             LLMRequest(system_prompt="", question="", reviews=())
         )
+
+
+def test_app_uses_openai_provider_when_a_key_is_configured(settings, token_verifier):
+    settings.openai_api_key = SecretStr("sk-test-key")
+
+    app = create_app(settings, token_verifier=token_verifier)
+
+    assert isinstance(app.state.llm_client, OpenAIReviewLLM)
+
+
+def test_injected_llm_client_takes_precedence_over_provider_configuration(
+    settings, token_verifier, fake_llm
+):
+    settings.openai_api_key = SecretStr("sk-test-key")
+
+    app = create_app(settings, token_verifier=token_verifier, llm_client=fake_llm)
+
+    assert app.state.llm_client is fake_llm

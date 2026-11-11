@@ -7,6 +7,7 @@ from app.api import health, me, questions, targets
 from app.auth.tokens import TokenVerifier
 from app.config import Settings, get_settings
 from app.qa.llm import LLMClient, UnconfiguredLLMClient
+from app.qa.openai_provider import OpenAIReviewLLM
 
 
 def create_app(
@@ -28,7 +29,14 @@ def create_app(
         settings.supabase_auth_issuer,
         settings.supabase_publishable_key,
     )
-    app.state.llm_client = llm_client or UnconfiguredLLMClient()
+    if llm_client is not None:
+        app.state.llm_client = llm_client
+    elif settings.openai_api_key is not None:
+        app.state.llm_client = OpenAIReviewLLM(
+            settings.openai_api_key.get_secret_value()
+        )
+    else:
+        app.state.llm_client = UnconfiguredLLMClient()
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,

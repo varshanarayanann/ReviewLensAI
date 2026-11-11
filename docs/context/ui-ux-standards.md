@@ -182,6 +182,11 @@ previously saved reviews are still available for Q&A.
 1. **Ingestion panel**: latest ingestion state, the primary `Ingest reviews` action (from the source URL), the secondary `Upload a CSV instead` action, and the result message of the latest attempt.
 2. **Reviews panel**: persisted reviews for this target (`Reviews (N)` header + list), or an empty state if none.
 
+The analysis workspace's **Switch target** action (S2-017) lists the user's
+other analysis targets by name and source. Selecting a target opens its
+workspace route, which drives the target header, ingestion summary, and Q&A
+context. The selected target remains identified by the workspace heading.
+
 ### 3.4 Dashboard layout (`/dashboard`)
 
 - Page header: title `Dashboard`, description `Your analysis targets`, primary action `New target`.

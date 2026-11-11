@@ -62,6 +62,13 @@ The API uses request-scoped sessions. Fresh reads reflect committed data visible
 under the database transaction's isolation; this is not a guarantee that an
 in-flight answer changes when a later import commits.
 
+For S2-018, the workspace URL identifies the active target for both summary
+and Q&A. Changing the target remounts the workspace, so the next question uses
+the new URL and the previous question and answer are cleared. The workspace
+test verifies that routing behavior, and the backend integration test checks
+the exact persisted review records supplied to the model across an A → B → A
+sequence.
+
 [OWASP's prompt-injection guidance](https://cheatsheetseries.owasp.org/cheatsheets/LLM_Prompt_Injection_Prevention_Cheat_Sheet.html)
 recommends separating instructions from untrusted content. Review text and target
 names are data, never permission to change scope. Adapters must preserve this

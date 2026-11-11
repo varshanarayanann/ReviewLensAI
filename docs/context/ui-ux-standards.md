@@ -172,6 +172,11 @@ panel under the target details alongside the existing summary and ingestion
 controls. It submits one question to `POST /api/targets/{id}/questions`, shows
 progress and the current response, and keeps the question available for retry.
 
+**S2-020:** Offer the question form when the persisted review summary confirms
+that the active target has reviews. With zero reviews, show guidance to upload
+a CSV. After a failed import, use the persisted count to determine whether
+previously saved reviews are still available for Q&A.
+
 **Reviews tab layout (Sprint 1):**
 
 1. **Ingestion panel**: latest ingestion state, the primary `Ingest reviews` action (from the source URL), the secondary `Upload a CSV instead` action, and the result message of the latest attempt.

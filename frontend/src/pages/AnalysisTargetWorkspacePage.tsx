@@ -128,8 +128,17 @@ function Workspace({ apiBaseUrl, targetId, token }: { apiBaseUrl: string; target
   return <>
     {state.kind === 'ready' && <WorkspaceTargetSwitcher apiBaseUrl={apiBaseUrl} targetId={targetId} token={token} />}
     <AnalysisTargetWorkspaceView state={state} summary={summary} onRetrySummary={() => void refreshSummary()}>
-      {state.kind === 'ready' && <ReviewQuestionPanel apiBaseUrl={apiBaseUrl} targetId={targetId}
-        targetName={state.target.name} token={token} onAccessDenied={() => setState({ kind: 'missing' })} />}
+      {state.kind === 'ready' && <section className="workspace-questions" aria-labelledby="review-questions-title">
+        <h2 id="review-questions-title">Ask about reviews</h2>
+        {summary.kind === 'ready' && summary.summary.review_count > 0
+          ? <ReviewQuestionPanel apiBaseUrl={apiBaseUrl} targetId={targetId}
+            targetName={state.target.name} token={token} onAccessDenied={() => setState({ kind: 'missing' })} />
+          : <p aria-live="polite" className="muted">{
+            summary.kind === 'ready' ? MESSAGES.questionNoReviews
+              : summary.kind === 'loading' ? MESSAGES.questionCheckingReviews
+                : MESSAGES.questionReviewCheckFailed
+          }</p>}
+      </section>}
       <section className="workspace-ingestion" aria-live="polite">
         <h2>Ingest reviews</h2>
         <p className="muted">{MESSAGES.ingestionUnavailable}</p>

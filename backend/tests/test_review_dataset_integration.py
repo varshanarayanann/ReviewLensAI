@@ -15,7 +15,12 @@ from sqlalchemy.orm import Session
 from app.models import Base
 from app.models.ingestion import IngestionRun, Review
 from tests.conftest import USER_A_ID
-from tests.qa_harness import assert_not_in_context, supplied_review_ids, supplied_texts
+from tests.qa_harness import (
+    assert_not_in_context,
+    supplied_review_ids,
+    supplied_target_ids,
+    supplied_texts,
+)
 from tests.test_target_workflow import USER_B_ID
 from tests.test_target_workflow import database as database  # Shared DB fixture.
 
@@ -355,12 +360,37 @@ def test_summary_and_qa_follow_the_active_target_together(client, fake_llm, as_u
     ingest(client, owner, battery, BATTERY_CSV)
     ingest(client, owner, service, SERVICE_CSV)
 
-    for target_id, expected_count in ((battery, 3), (service, 2), (battery, 3)):
-        ask(client, owner, target_id)
+    question = "What do customers say about this target?"
+    for target_id, expected, name, other_name in (
+        (battery, BATTERY_DATASET, "Phone store", "Call center"),
+        (service, SERVICE_DATASET, "Call center", "Phone store"),
+        (battery, BATTERY_DATASET, "Phone store", "Call center"),
+    ):
+        response = ask(client, owner, target_id, question)
+        assert response.status_code == 200
+        answer = response.json()
+        assert (answer["target_id"], answer["status"], answer["review_count"]) == (
+            target_id,
+            "answered",
+            len(expected),
+        )
+        request = fake_llm.last_request
         result = summary(client, owner, target_id)
 
-        assert result["review_count"] == expected_count
-        assert_summary_matches_qa_context(result, fake_llm.last_request, target_id)
+        assert request.question == question
+        assert (
+            sorted((review.rating, review.text) for review in request.reviews)
+            == expected
+        )
+        assert supplied_target_ids(request) == {UUID(target_id)}
+        assert supplied_review_ids(request) == listable_review_ids(
+            client, owner, target_id
+        )
+        assert f'"{name}"' in request.system_prompt
+        assert_not_in_context(request, other_name)
+        assert_summary_matches_qa_context(result, request, target_id)
+
+    assert len(fake_llm.requests) == 3
 
 
 def test_target_without_persisted_reviews_has_no_summary_or_qa_dataset(

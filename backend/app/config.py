@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     openai_api_key: SecretStr | None = None
     llm_base_url: str | None = Field(default=None, pattern=r"^https://[^\s/]+")
     llm_model: str | None = Field(default=None, min_length=1)
+    apify_api_token: SecretStr | None = None
+    review_max_per_run: int = Field(default=20, ge=1, le=1000)
+    review_max_charge_usd: float = Field(default=0.10, gt=0, le=5)
 
     @field_validator("cors_origins", mode="before")
     @classmethod
@@ -45,7 +48,7 @@ class Settings(BaseSettings):
             raise ValueError("use the publishable key, not a secret key")
         return value.strip()
 
-    @field_validator("openai_api_key")
+    @field_validator("openai_api_key", "apify_api_token")
     @classmethod
     def reject_empty_openai_api_key(cls, value: SecretStr | None) -> SecretStr | None:
         if value is not None and not value.get_secret_value().strip():

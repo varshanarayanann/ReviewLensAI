@@ -1,5 +1,9 @@
 # S1-020 — Review ingestion approach
 
+**Current update:** Direct Google Maps collection is implemented separately
+through Apify. See [Google Maps collection](google-maps-ingestion.md).
+The original S1-020 scope and CSV adapter decisions below remain documented.
+
 **Rules:** S1-BR-019 through S1-BR-021, S1-BR-024.
 
 ## Selected implementation

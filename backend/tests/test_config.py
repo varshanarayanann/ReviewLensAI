@@ -15,6 +15,22 @@ def settings_with(**overrides: object):
     return load_settings(_env_file=None, **{**REQUIRED, **overrides})
 
 
+def test_google_maps_settings_are_bounded_and_secret():
+    settings = settings_with(apify_api_token="secret-apify-test")
+    assert settings.review_max_per_run == 20
+    assert settings.review_max_charge_usd == 0.10
+    assert "secret-apify-test" not in repr(settings)
+    for overrides in (
+        {"apify_api_token": " "},
+        {"review_max_per_run": 0},
+        {"review_max_per_run": 1001},
+        {"review_max_charge_usd": 0},
+        {"review_max_charge_usd": 6},
+    ):
+        with pytest.raises(ConfigurationError):
+            settings_with(**overrides)
+
+
 def test_settings_parse_comma_separated_cors_origins() -> None:
     settings = settings_with(
         cors_origins="http://localhost:5173, https://reviewlens.netlify.app"

@@ -5,7 +5,7 @@ import { Alert } from '../components/ui/Alert'
 import { ReviewQuestionPanel } from '../components/workspace/ReviewQuestionPanel'
 import { AnalysisTargetWorkspaceView, type AnalysisTargetWorkspaceState, type ReviewSummaryState } from '../components/workspace/AnalysisTargetWorkspaceView'
 import { WorkspaceTargetSwitcher } from '../components/workspace/WorkspaceTargetSwitcher'
-import { ApiError, getReviewSummary, getWorkspace, uploadReviews, type IngestionResultResponse } from '../lib/api/client'
+import { ApiError, collectGoogleMapsReviews, getReviewSummary, getWorkspace, uploadReviews, type IngestionResultResponse } from '../lib/api/client'
 import { useAuth } from '../lib/auth/AuthContext'
 import { MESSAGES } from '../lib/messages'
 
@@ -18,6 +18,8 @@ function Workspace({ apiBaseUrl, targetId, token }: { apiBaseUrl: string; target
   const [file, setFile] = useState<File | null>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [collecting, setCollecting] = useState(false)
+  const [collectionError, setCollectionError] = useState('')
   const mounted = useRef(false)
   const uploading = useRef(false)
   const summaryRequestId = useRef(0)
@@ -101,6 +103,7 @@ function Workspace({ apiBaseUrl, targetId, token }: { apiBaseUrl: string; target
     uploading.current = true
     setBusy(true)
     setError('')
+    setCollectionError('')
     try {
       const csv = await file.text()
       if (!mounted.current) return
@@ -117,11 +120,41 @@ function Workspace({ apiBaseUrl, targetId, token }: { apiBaseUrl: string; target
     }
   }
 
+  async function collect() {
+    if (uploading.current || state.kind !== 'ready' || result?.state === 'processing') return
+    uploading.current = true
+    setBusy(true)
+    setCollecting(true)
+    setCollectionError('')
+    setError('')
+    try {
+      const next = await collectGoogleMapsReviews(apiBaseUrl, targetId, token)
+      if (!mounted.current) return
+      setResult(next)
+      setState({ kind: 'ready', target: { ...state.target, latestIngestionState: next.state } })
+      if (next.state === 'succeeded' || next.state === 'partial') void refreshSummary()
+    } catch (failure) {
+      if (!mounted.current) return
+      if (failure instanceof ApiError && [401, 403, 404].includes(failure.status)) {
+        handleFailure(failure)
+      } else {
+        setCollectionError(failure instanceof ApiError ? MESSAGES.mapsCollectionFailed : MESSAGES.offline)
+      }
+    } finally {
+      uploading.current = false
+      if (mounted.current) {
+        setBusy(false)
+        setCollecting(false)
+      }
+    }
+  }
+
   function refresh() {
     setState({ kind: 'loading' })
     setResult(null)
     setFile(null)
     setError('')
+    setCollectionError('')
     setAttempt((value) => value + 1)
   }
 
@@ -141,7 +174,11 @@ function Workspace({ apiBaseUrl, targetId, token }: { apiBaseUrl: string; target
       </section>}
       <section className="workspace-ingestion" aria-live="polite">
         <h2>Ingest reviews</h2>
-        <p className="muted">{MESSAGES.ingestionUnavailable}</p>
+        <p className="muted">{MESSAGES.ingestionSource}</p>
+        <button type="button" className="button button--primary" disabled={busy || result?.state === 'processing'}
+          onClick={() => void collect()}>{collecting ? 'Ingesting...' : 'Ingest reviews'}</button>
+        {collecting && <p className="muted">{MESSAGES.mapsCollectionBusy}</p>}
+        {collectionError && <Alert variant="danger">{collectionError}</Alert>}
         {result && <Alert variant={
           result.state === 'failed' ? 'danger'
             : result.state === 'partial' ? 'warning'
@@ -156,8 +193,8 @@ function Workspace({ apiBaseUrl, targetId, token }: { apiBaseUrl: string; target
             disabled={busy || result?.state === 'processing'}
             onChange={(event) => { setFile(event.target.files?.[0] ?? null); setError('') }} />
           {error && <div id="csv-error"><Alert variant="danger">{error}</Alert></div>}
-          <button className="button button--primary" disabled={busy || result?.state === 'processing'}>
-            {busy ? 'Uploading...' : 'Upload reviews'}
+          <button className="button button--secondary" disabled={busy || result?.state === 'processing'}>
+            {busy && !collecting ? 'Uploading...' : 'Upload reviews'}
           </button>
           {result?.state === 'processing' && <p>{MESSAGES.ingestionBusy}</p>}
         </form>

@@ -66,6 +66,9 @@ def isolated_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         "OPENAI_BASE_URL",
         "LLM_BASE_URL",
         "LLM_MODEL",
+        "APIFY_API_TOKEN",
+        "REVIEW_MAX_PER_RUN",
+        "REVIEW_MAX_CHARGE_USD",
     ):
         monkeypatch.delenv(name, raising=False)
 

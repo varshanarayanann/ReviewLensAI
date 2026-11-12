@@ -65,6 +65,12 @@ export function uploadReviews(base: string, targetId: string, token: string, csv
   )
 }
 
+export function collectGoogleMapsReviews(base: string, targetId: string, token: string) {
+  return targetRequest<IngestionResultResponse>(
+    base, `/${encodeURIComponent(targetId)}/ingestions/google-maps`, token, {},
+  )
+}
+
 export async function getTargets(
   apiBaseUrl: string,
   accessToken: string,

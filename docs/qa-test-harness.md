@@ -98,7 +98,10 @@ serialized prompt and input against a conservative 800,000-token input budget
 before calling the API. Its UTF-8 byte count upper-bounds text token count, with
 10,000 tokens reserved for API framing.
 
-Set `OPENAI_API_KEY` in `backend/.env` to enable it locally. Do not send real
+Set `OPENAI_API_KEY` in `backend/.env` to enable it locally. To use another
+Responses-API-compatible provider, also set `LLM_BASE_URL` and `LLM_MODEL`
+(for xAI Grok: `https://api.x.ai/v1` and `grok-4.7`) and put that provider's
+key in `OPENAI_API_KEY`; the request shape and safeguards stay the same. Do not send real
 review data to a provider unless the deployment's data-handling requirements
 permit it. Provider failures and malformed replies become
 `LLMUnavailableError`; the API logs only the target ID and error class, never

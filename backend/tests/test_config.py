@@ -114,6 +114,33 @@ def test_empty_openai_key_is_rejected_without_echoing_value() -> None:
     assert "must not be empty" not in str(exc_info.value)
 
 
+def test_llm_provider_defaults_to_openai_when_not_configured() -> None:
+    settings = settings_with()
+
+    assert settings.llm_base_url is None
+    assert settings.llm_model is None
+
+
+def test_compatible_llm_provider_can_be_configured() -> None:
+    settings = settings_with(
+        llm_base_url=" https://api.x.ai/v1/ ", llm_model=" grok-4.7 "
+    )
+
+    assert settings.llm_base_url == "https://api.x.ai/v1"
+    assert settings.llm_model == "grok-4.7"
+
+
+@pytest.mark.parametrize("value", ["http://api.x.ai/v1", "api.x.ai/v1", ""])
+def test_llm_base_url_must_use_https(value: str) -> None:
+    with pytest.raises(ConfigurationError, match="LLM_BASE_URL"):
+        settings_with(llm_base_url=value)
+
+
+def test_blank_llm_model_is_rejected() -> None:
+    with pytest.raises(ConfigurationError, match="LLM_MODEL"):
+        settings_with(llm_model="  ")
+
+
 @pytest.mark.parametrize(
     ("url", "expected"),
     [

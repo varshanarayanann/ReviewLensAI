@@ -7,7 +7,7 @@ from app.api import health, me, questions, targets
 from app.auth.tokens import TokenVerifier
 from app.config import Settings, get_settings
 from app.qa.llm import LLMClient, UnconfiguredLLMClient
-from app.qa.openai_provider import OpenAIReviewLLM
+from app.qa.openai_provider import configured_client
 
 
 def create_app(
@@ -32,9 +32,7 @@ def create_app(
     if llm_client is not None:
         app.state.llm_client = llm_client
     elif settings.openai_api_key is not None:
-        app.state.llm_client = OpenAIReviewLLM(
-            settings.openai_api_key.get_secret_value()
-        )
+        app.state.llm_client = configured_client(settings)
     else:
         app.state.llm_client = UnconfiguredLLMClient()
     app.add_middleware(

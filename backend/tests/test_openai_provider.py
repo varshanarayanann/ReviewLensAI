@@ -69,6 +69,7 @@ def test_openai_adapter_sends_question_and_reviews_as_json_and_parses_reply(
 
     assert client_options == {
         "api_key": "test-key",
+        "base_url": None,
         "max_retries": 0,
         "timeout": openai_provider.TIMEOUT_SECONDS,
     }
@@ -211,12 +212,16 @@ def test_input_over_budget_is_rejected_before_provider_call(
     assert responses.arguments is None
 
 
+def provider_settings(api_key=None, base_url=None, model=None) -> SimpleNamespace:
+    return SimpleNamespace(
+        openai_api_key=api_key, llm_base_url=base_url, llm_model=model
+    )
+
+
 def test_manual_evaluation_factory_requires_a_configured_key(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    monkeypatch.setattr(
-        openai_provider, "get_settings", lambda: SimpleNamespace(openai_api_key=None)
-    )
+    monkeypatch.setattr(openai_provider, "get_settings", provider_settings)
 
     with pytest.raises(RuntimeError, match="Set OPENAI_API_KEY"):
         openai_provider.create_client()
@@ -229,7 +234,7 @@ def test_manual_evaluation_factory_uses_the_configured_key(
     monkeypatch.setattr(
         openai_provider,
         "get_settings",
-        lambda: SimpleNamespace(openai_api_key=SecretStr("test-key")),
+        lambda: provider_settings(SecretStr("test-key")),
     )
     monkeypatch.setattr(
         openai_provider,
@@ -238,3 +243,60 @@ def test_manual_evaluation_factory_uses_the_configured_key(
     )
 
     assert isinstance(openai_provider.create_client(), openai_provider.OpenAIReviewLLM)
+
+
+def test_configured_compatible_provider_receives_requests_and_model(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    sent = {}
+    answer_text = '{"outcome":"answered","answer":"Reviewers praise the staff."}'
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        sent["url"] = str(request.url)
+        sent["body"] = json.loads(request.content)
+        return httpx.Response(
+            200,
+            json={
+                "id": "resp_test",
+                "created_at": 1,
+                "model": "grok-test",
+                "object": "response",
+                "output": [
+                    {
+                        "id": "msg_test",
+                        "content": [
+                            {
+                                "annotations": [],
+                                "text": answer_text,
+                                "type": "output_text",
+                            }
+                        ],
+                        "role": "assistant",
+                        "status": "completed",
+                        "type": "message",
+                    }
+                ],
+                "parallel_tool_calls": True,
+                "tool_choice": "auto",
+                "tools": [],
+                "status": "completed",
+            },
+        )
+
+    real_openai = OpenAI
+    http_client = httpx.Client(transport=httpx.MockTransport(handle))
+    monkeypatch.setattr(
+        openai_provider,
+        "OpenAI",
+        lambda **kwargs: real_openai(**kwargs, http_client=http_client),
+    )
+    settings = provider_settings(
+        SecretStr("xai-test-key"), "https://api.x.ai/v1", "grok-test"
+    )
+
+    answer = openai_provider.configured_client(settings).complete(make_request())
+
+    assert sent["url"] == "https://api.x.ai/v1/responses"
+    assert sent["body"]["model"] == "grok-test"
+    assert sent["body"]["store"] is False
+    assert answer.text == "Reviewers praise the staff."

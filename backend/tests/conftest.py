@@ -63,6 +63,9 @@ def isolated_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         "SUPABASE_URL",
         "SUPABASE_PUBLISHABLE_KEY",
         "OPENAI_API_KEY",
+        "OPENAI_BASE_URL",
+        "LLM_BASE_URL",
+        "LLM_MODEL",
     ):
         monkeypatch.delenv(name, raising=False)
 

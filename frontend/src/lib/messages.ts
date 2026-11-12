@@ -11,7 +11,7 @@ export const MESSAGES = {
   noOtherTargets: 'You have no other analysis targets. Add one from the dashboard.',
   csvFile: 'Choose a CSV file smaller than 1 MB.',
   csvFormat: 'Check that your CSV has rating and review_text columns and is smaller than 1 MB.',
-  csvRecovery: 'Upload reviews from a CSV with rating and review_text columns. Ratings must be integers from 1 to 5. Maximum 1,000 reviews. Invalid rows reject the entire import; existing reviews are retained.',
+  csvRecovery: 'Upload reviews from a CSV with rating and review_text columns. Ratings must be integers from 1 to 5. Maximum 1,000 reviews. Valid rows are imported and invalid rows are skipped and counted as rejected; existing reviews are retained.',
   ingestionUnavailable: 'Collection from the saved Google Maps URL is not available yet. You can upload a CSV instead.',
   ingestionBusy: 'Ingestion is already running. Refresh the workspace to check its result.',
   noTargets: 'No analysis targets yet',

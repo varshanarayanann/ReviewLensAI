@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     supabase_url: str = Field(pattern=r"^https?://[^\s/]+")
     supabase_publishable_key: str = Field(min_length=1)
     openai_api_key: SecretStr | None = None
+    llm_base_url: str | None = Field(default=None, pattern=r"^https://[^\s/]+")
+    llm_model: str | None = Field(default=None, min_length=1)
 
     @field_validator("cors_origins", mode="before")
     @classmethod
@@ -26,10 +28,15 @@ class Settings(BaseSettings):
             return [origin.strip() for origin in value.split(",") if origin.strip()]
         return value
 
-    @field_validator("supabase_url", mode="before")
+    @field_validator("supabase_url", "llm_base_url", mode="before")
     @classmethod
     def strip_trailing_slash(cls, value: object) -> object:
         return value.strip().rstrip("/") if isinstance(value, str) else value
+
+    @field_validator("llm_model", mode="before")
+    @classmethod
+    def strip_model_name(cls, value: object) -> object:
+        return value.strip() if isinstance(value, str) else value
 
     @field_validator("supabase_publishable_key")
     @classmethod

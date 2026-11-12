@@ -62,7 +62,8 @@ are on `nidhi/sprint2-review-context`, pending PR review/merge, not released mai
   recurrence claims, use of ratings, and balanced treatment of disagreement.
 - `backend/app/qa/openai_provider.py` sends the active question and persisted
   reviews as JSON data to the OpenAI Responses API using `gpt-5.6-terra` when
-  `OPENAI_API_KEY` is set. Calls are stateless, disable response storage,
+  `OPENAI_API_KEY` is set; optional `LLM_BASE_URL` and `LLM_MODEL` point it at
+  another Responses-compatible provider such as xAI Grok. Calls are stateless, disable response storage,
   enforce a conservative input budget, and map provider/format failures to safe
   service errors. The key is optional; without it Q&A remains safely unavailable.
 - Deterministic adapter tests and the manual scope evaluation do not prove live

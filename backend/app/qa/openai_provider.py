@@ -1,10 +1,14 @@
-"""Stateless OpenAI Responses API adapter for review-grounded Q&A."""
+"""Stateless Responses API adapter for review-grounded Q&A.
+
+Defaults to OpenAI; ``LLM_BASE_URL`` and ``LLM_MODEL`` point it at another
+Responses-compatible provider such as xAI.
+"""
 
 import json
 
 from openai import APIError, OpenAI
 
-from app.config import get_settings
+from app.config import Settings, get_settings
 from app.qa.llm import LLMRequest, LLMResponse, LLMUnavailableError
 from app.qa.reply import parse_model_reply
 
@@ -16,9 +20,13 @@ TIMEOUT_SECONDS = 30
 
 
 class OpenAIReviewLLM:
-    def __init__(self, api_key: str) -> None:
+    def __init__(
+        self, api_key: str, *, base_url: str | None = None, model: str = MODEL
+    ) -> None:
+        self._model = model
         self._client = OpenAI(
             api_key=api_key,
+            base_url=base_url,
             max_retries=0,
             timeout=TIMEOUT_SECONDS,
         )
@@ -43,7 +51,7 @@ class OpenAIReviewLLM:
 
         try:
             response = self._client.responses.create(
-                model=MODEL,
+                model=self._model,
                 instructions=request.system_prompt,
                 input=evidence,
                 max_output_tokens=MAX_OUTPUT_TOKENS,
@@ -59,9 +67,16 @@ class OpenAIReviewLLM:
         return parse_model_reply(response.output_text)
 
 
+def configured_client(settings: Settings) -> OpenAIReviewLLM:
+    if settings.openai_api_key is None:
+        raise RuntimeError("Set OPENAI_API_KEY to run the live Q&A evaluation.")
+    return OpenAIReviewLLM(
+        settings.openai_api_key.get_secret_value(),
+        base_url=settings.llm_base_url,
+        model=settings.llm_model or MODEL,
+    )
+
+
 def create_client() -> OpenAIReviewLLM:
     """Create the configured client for the manual model evaluation command."""
-    api_key = get_settings().openai_api_key
-    if api_key is None:
-        raise RuntimeError("Set OPENAI_API_KEY to run the live Q&A evaluation.")
-    return OpenAIReviewLLM(api_key.get_secret_value())
+    return configured_client(get_settings())

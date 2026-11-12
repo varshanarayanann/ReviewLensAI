@@ -49,10 +49,15 @@ def build_system_prompt(target: AnalysisTarget) -> str:
         '{"outcome": "<outcome>", "answer": "<text shown to the user>"}. '
         "Use one of these outcomes:\n"
         '- "answered": the supplied reviews support the answer.\n'
-        '- "insufficient_evidence": the question is about these reviews, but they '
-        "do not contain enough information. Say what is missing.\n"
-        '- "out_of_scope": the question is outside these reviews. Politely '
-        "decline, explain that ReviewLens answers questions only about the "
-        f"{platform} reviews of {target_name}, and invite the user to ask about "
-        "those reviews instead.\n"
+        '- "insufficient_evidence": the question asks only about '
+        f"{target_name} as described in these {platform} reviews, but the "
+        "reviews do not contain enough information. Say what is missing.\n"
+        '- "out_of_scope": the question is unrelated general knowledge; names or '
+        "asks about any other business, product, location, or branch; asks about "
+        f"any review platform or source other than {platform}; or compares this "
+        'target with anything outside these reviews. Use "out_of_scope" for these '
+        "even when the supplied reviews simply say nothing about them, and never "
+        "attribute these reviews to another business. Politely decline, explain "
+        f"that ReviewLens answers questions only about the {platform} reviews of "
+        f"{target_name}, and invite the user to ask about those reviews instead.\n"
     )

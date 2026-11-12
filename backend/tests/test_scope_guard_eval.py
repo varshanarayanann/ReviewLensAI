@@ -141,6 +141,24 @@ def test_system_prompt_defines_the_reply_format_the_grader_relies_on():
         assert f'"{outcome.value}"' in prompt
 
 
+def test_system_prompt_separates_other_entities_from_missing_evidence():
+    prompt = build_system_prompt(
+        AnalysisTarget(name=EVAL.target_name, platform=EVAL.platform)
+    )
+    insufficient = prompt[
+        prompt.index('- "insufficient_evidence"') : prompt.index('- "out_of_scope"')
+    ]
+    out_of_scope = prompt[prompt.index('- "out_of_scope"') :]
+
+    assert f"asks only about {json.dumps(EVAL.target_name)}" in insufficient
+    assert "any other business, product, location, or branch" in out_of_scope
+    assert "any review platform or source other than Google Maps" in out_of_scope
+    assert "even when the supplied reviews simply say nothing about them" in (
+        out_of_scope
+    )
+    assert "never attribute these reviews to another business" in out_of_scope
+
+
 def test_system_prompt_guides_grounded_review_synthesis():
     prompt = build_system_prompt(
         AnalysisTarget(name=EVAL.target_name, platform=EVAL.platform)

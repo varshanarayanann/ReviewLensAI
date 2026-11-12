@@ -107,3 +107,16 @@ Total: 14/15 passed
 The command exits with 1 if any case fails. Live models vary between runs, so
 investigate a failure by rerunning it and, if it persists, adjust the system
 prompt (S2-013), not the expected outcome.
+
+### Recorded live results
+
+| Date | Provider and model | Result | Notes |
+| --- | --- | --- | --- |
+| 2026-11-11 | Groq, `openai/gpt-oss-120b` | 13/18 | Every in-scope, insufficient-evidence and general-knowledge case passed. All five failures were other-entity or other-platform questions labelled `insufficient_evidence` instead of `out_of_scope`: declined, but with the wrong outcome. |
+
+The prompt now states that questions naming another business, branch, or review
+source are `out_of_scope` even when the reviews simply do not mention them. On
+the 12 boundary-heavy cases (the other-entity and other-platform cases plus
+three in-scope or insufficient-evidence checks), one Groq run went from 7/12 to
+10/12, with no regressions in the in-scope or insufficient-evidence cases. Single
+runs of a live model are noisy, so rerun the full set before relying on this.

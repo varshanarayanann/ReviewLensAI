@@ -1,5 +1,14 @@
 # ReviewLens AI — Project Context and Agent Guide
 
+## Google Maps ingestion update
+
+The workspace's primary ingestion action uses the saved Google Maps URL through
+Apify's Compass review actor. Configure `APIFY_API_TOKEN` in backend/.env.
+Defaults are 20 reviews and a USD 0.10 provider cap per run. Ownership is checked
+before collection, and records use the same normalization and persistence
+path as CSV. See [Google Maps collection](docs/google-maps-ingestion.md).
+This supersedes older statements below that URL collection is unimplemented.
+
 ## Current implementation and task update — 2026-11-09
 
 **Read this section first.** The numbered research snapshot below is historical

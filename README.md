@@ -1,5 +1,10 @@
 # ReviewLens AI
 
+Direct Google Maps ingestion is available through Apify. Add `APIFY_API_TOKEN`
+to the ignored backend environment, restart the API, and use **Ingest reviews**
+in a target workspace. See [Google Maps collection](docs/google-maps-ingestion.md)
+for setup, per-run limits, and provider requirements.
+
 A multi-user Review Intelligence Portal (CS 490 capstone). Users create analysis
 targets for Google Maps businesses, ingest their reviews, and (from Sprint 2) ask
 questions grounded only in those reviews.
@@ -244,8 +249,9 @@ The committed `.env.example` files list every required name. Never commit secret
 | `OPENAI_API_KEY` | No | **Secret.** Enables review-grounded Q&A through OpenAI's Responses API. Without it, nonempty Q&A returns a safe 503. Set it only in `backend/.env`; review content is sent to OpenAI when a question is asked. With `LLM_BASE_URL` set, this holds that provider's key instead |
 | `LLM_BASE_URL` | No | HTTPS base URL of another Responses-API-compatible provider, e.g. `https://api.x.ai/v1` for xAI Grok. Unset means OpenAI |
 | `LLM_MODEL` | No | Model name for the provider, e.g. `grok-4.7`. Unset means `gpt-5.6-terra` |
-| `REVIEW_PROVIDER_API_KEY` | Future URL integration | Reserved server-side secret placeholder; not read by Settings or required for the S1-020 CSV import path |
-| `REVIEW_MAX_PER_RUN` | Future URL integration | Reserved provider cap; current CSV imports use a fixed maximum of 1,000 records |
+| `APIFY_API_TOKEN` | No | Server-side secret enabling direct Google Maps collection through the Compass actor |
+| `REVIEW_MAX_PER_RUN` | No | Google Maps review limit per collection, defaults to 20, maximum 1,000 |
+| `REVIEW_MAX_CHARGE_USD` | No | Maximum Apify charge per attempt, defaults to USD 0.10, maximum USD 5 |
 
 The backend refuses to start and names the missing variables if a required value is absent.
 `DATABASE_URL` is stored as a secret value, so it prints as `**********` in logs and errors.
@@ -271,9 +277,8 @@ Source rejection never inserts sample reviews or substitutes test fixtures.
 
 See [the selected ingestion approach](docs/review-ingestion-approach.md) and
 [CSV format](docs/csv-import-format.md) for limits, fixture provenance, and normalization
-integration notes. This implements the issue's practical-import option;
-automatic collection from the saved Google Maps URL still requires a separately
-selected/configured provider integration. No provider key is needed for CSV.
+integration notes. Direct URL collection uses the configured
+[Apify integration](docs/google-maps-ingestion.md). No provider key is needed for CSV.
 
 ## Ingestion source submission (S1-019)
 
@@ -286,8 +291,8 @@ targets share the same 404 response and start no processing.
 
 See [the CSV source contract](docs/csv-import-format.md) for exact columns, limits,
 and outcome semantics, and [the S1-019 handoff](docs/handoffs/s1-019-ingestion.md)
-for the original issue author's branch/PR instructions. Primary URL/provider
-collection remains separate work; no provider credentials are needed for CSV.
+for the original issue author's branch/PR instructions. Primary URL collection
+uses the configured Apify integration; no provider credentials are needed for CSV.
 
 ## Database migrations
 

@@ -1,9 +1,9 @@
 import logging
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from uuid import UUID, uuid4
 
 import fastapi
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
@@ -15,6 +15,7 @@ from app.db import get_db
 from app.models import AnalysisTarget
 from app.models.ingestion import IngestionRun, Review
 from app.reviews.csv_source import ReviewSourceError, parse_csv_reviews
+from app.reviews.google_maps import ApifyReviewSource, ReviewCollectionError
 from app.reviews.normalization import normalize_reviews
 from app.schemas import target_list
 from app.schemas.analysis_target import AnalysisTargetCreate, AnalysisTargetRead
@@ -116,6 +117,35 @@ class CsvImport(BaseModel):
     csv_text: str = Field(min_length=1, max_length=1_000_000)
 
 
+class GoogleMapsImport(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+def get_google_maps_source(request: Request) -> ApifyReviewSource:
+    settings = request.app.state.settings
+    return ApifyReviewSource(
+        settings.apify_api_token,
+        settings.review_max_per_run,
+        settings.review_max_charge_usd,
+    )
+
+
+@router.post("/{target_id}/ingestions/google-maps", response_model=IngestionResult)
+def ingest_google_maps(
+    target_id: UUID,
+    body: GoogleMapsImport,
+    user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    source: ApifyReviewSource = Depends(get_google_maps_source),
+):
+    target = owned(target_id, user, db)
+    if not source.configured:
+        raise HTTPException(
+            503, "Google Maps collection is unavailable. Upload a CSV instead."
+        )
+    return persist_ingestion(db, target, lambda: source.collect(target.source_url))
+
+
 @router.post("/{target_id}/ingestions", response_model=IngestionResult)
 def ingest(
     target_id: UUID,
@@ -133,6 +163,17 @@ def ingest(
             "Provide a CSV with rating and review_text columns and 1–1,000 "
             "reviews (maximum 1 MB).",
         ) from None
+    return persist_ingestion(db, target, lambda: records, csv_ratings=True)
+
+
+def persist_ingestion(
+    db: Session,
+    target: AnalysisTarget,
+    load_records: Callable[[], list[object]],
+    *,
+    csv_ratings: bool = False,
+) -> IngestionResult:
+    target_id = target.id
     run = IngestionRun(target_id=target.id)
     db.add(run)
     try:
@@ -149,9 +190,10 @@ def ingest(
         raise HTTPException(503, INGESTION_UNAVAILABLE_DETAIL) from None
     run_id = run.id
     try:
+        records = load_records()
         route_records: list[object] = []
         for record in records:
-            if isinstance(record, Mapping) and "rating" in record:
+            if csv_ratings and isinstance(record, Mapping) and "rating" in record:
                 record = dict(record)
                 try:
                     record["rating"] = int(record.get("rating") or "")
@@ -178,7 +220,7 @@ def ingest(
         run.persisted_count = len(rows)
         run.rejected_count = len(normalized.rejected)
         db.commit()
-    except SQLAlchemyError as exc:
+    except (SQLAlchemyError, ReviewCollectionError) as exc:
         rollback_safely(db, target.id, run_id, "review persistence")
         # Do not log CSV contents, driver parameters, or raw provider errors.
         logger.warning("Ingestion %s failed (%s)", run_id, type(exc).__name__)

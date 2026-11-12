@@ -179,6 +179,11 @@ previously saved reviews are still available for Q&A.
 
 **Reviews tab layout (Sprint 1):**
 
+The current primary **Ingest reviews** action collects from the saved Google
+Maps URL through the backend. It disables collection and CSV upload while work
+is pending. CSV upload remains visible as a secondary action. See
+[Google Maps collection](../google-maps-ingestion.md) for setup and limits.
+
 1. **Ingestion panel**: latest ingestion state, the primary `Ingest reviews` action (from the source URL), the secondary `Upload a CSV instead` action, and the result message of the latest attempt.
 2. **Reviews panel**: persisted reviews for this target (`Reviews (N)` header + list), or an empty state if none.
 

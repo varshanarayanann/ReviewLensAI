@@ -282,7 +282,7 @@ integration notes. Direct URL collection uses the configured
 
 ## Ingestion source submission (S1-019)
 
-The existing CSV import path submits JSON `csv_text` to
+The web UI no longer offers CSV upload. The CSV import API accepts JSON `csv_text` at
 `POST /api/targets/{target_id}/ingestions` with the current bearer token. The
 backend verifies target ownership before parsing, then checks required CSV
 structure and limits before creating an attempt. Rejected sources return 422
@@ -327,10 +327,10 @@ platform, saved source URL, and current basic ingestion status. The protected
 `GET /api/targets/{targetId}` response includes `id`, `name`, `platform`, and
 `source_url`; inaccessible and missing targets both return 404.
 
-Use **Upload a CSV** for the implemented ingestion path, then **Refresh workspace**
-to reload the persisted result. CSV import uses the existing API and limits;
-collection directly from the saved Google Maps URL remains provider-integration
-work. Dashboard card selection is delivered separately by S1-017; direct links
+Use **Ingest reviews** to collect reviews from the saved Google Maps URL, then
+**Refresh workspace** to reload the persisted result. The workspace no longer
+offers CSV upload; the CSV ingestion API below remains for API use and backend
+tests. Dashboard card selection is delivered separately by S1-017; direct links
 and navigation after target creation work without it.
 
 The original S1-018 author can integrate the completed feature and update her

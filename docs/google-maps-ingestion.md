@@ -5,7 +5,8 @@ URL using Apify's maintained `compass/google-maps-reviews-scraper` actor.
 The authenticated backend performs collection and persistence. The browser
 submits an empty JSON object to
 `POST /api/targets/{target_id}/ingestions/google-maps`.
-CSV import remains available at the existing ingestion endpoint.
+This is the only ingestion path in the web UI. The CSV ingestion endpoint
+remains for API use and backend tests.
 
 ## Local setup
 

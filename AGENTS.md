@@ -9,6 +9,11 @@ before collection, and records use the same normalization and persistence
 path as CSV. See [Google Maps collection](docs/google-maps-ingestion.md).
 This supersedes older statements below that URL collection is unimplemented.
 
+As of 2026-11-13 the workspace UI no longer offers CSV upload; **Ingest reviews**
+is the only UI ingestion path. The CSV ingestion API and its backend tests remain.
+This supersedes older statements below that describe CSV upload in the UI or as
+a UI fallback.
+
 ## Current implementation and task update — 2026-11-09
 
 **Read this section first.** The numbered research snapshot below is historical
@@ -115,7 +120,7 @@ The intended user journey is:
 2. Open the dashboard containing only the current user's targets.
 3. Create a target with a name, fixed Google Maps platform, and source URL.
 4. Open that target's analysis workspace.
-5. Ingest reviews from its saved URL; use CSV import as the documented fallback.
+5. Ingest reviews from its saved URL.
 6. See an explicit ingestion result and persisted reviews.
 7. In Sprint 2, inspect review summaries and ask review-grounded questions.
 
@@ -125,7 +130,7 @@ The intended user journey is:
 | Sprint 2 | Review summary/statistics, charts, review-grounded Q&A | Future scope; no implementation on main |
 | Sprint 3 | Netlify frontend and Render backend deployment | README deployment plan; no deployment configuration or verified live deployment found |
 
-Google Maps is the selected platform. Do not add a multi-platform selector. The UI baseline chooses URL ingestion as primary and CSV as recovery; generic story #19 permits either URL or practical import, so preserve the team's more specific baseline unless the active requirements change. No concrete review-data provider is selected in the inspected implementation. An outside suggestion on issue #20 is not a team decision.
+Google Maps is the selected platform. Do not add a multi-platform selector. The UI uses URL ingestion only; CSV upload was removed from the UI on 2026-11-13, and generic story #19 permits either URL or practical import. No concrete review-data provider is selected in the inspected implementation. An outside suggestion on issue #20 is not a team decision.
 
 Do not add Summary/Ask tabs, AI chat, rating charts, or “coming soon” placeholders to Sprint 1 work unless explicitly required by the active task. There is no LLM SDK, model selection, vector database, embedding pipeline, or implemented Q&A API on main.
 
@@ -398,7 +403,7 @@ Read the complete UI/UX context document for any screen change. Essential conven
 - Never render raw Supabase/FastAPI/SQL errors or exception messages. Map errors to shared copy. Render review text as text, never raw HTML.
 - Status uses text as well as color. Keyboard operation, visible focus, semantic controls, reduced-motion support, and appropriate focus management are required.
 - Check UI at 1280px, 768px, and 375px widths. Follow the document's UI PR checklist.
-- Reuse documented terms: Analysis target, Dashboard, Analysis workspace, Ingest reviews, Upload a CSV, Google Maps, Log in/Log out/Register.
+- Reuse documented terms: Analysis target, Dashboard, Analysis workspace, Ingest reviews, Google Maps, Log in/Log out/Register.
 
 The standards describe a destination, not the current component inventory: sidebar, toast provider, dialogs, target cards, status badges, URL fields, review lists, and workspace tabs remain to be built. Existing `TextField` supports only text/email/password, not URL or blur callbacks; existing `Alert` supports danger/success/info, not warning. Implement needed capabilities deliberately.
 
@@ -492,7 +497,7 @@ Board snapshot: **23 items**, all visible groups fully paginated: Backlog 10, Re
 
 A useful implementation dependency order (inferred from acceptance criteria, not an official schedule) is auth/protection → target model/ownership/validation → target create/list/workspace → authorized ingestion → extraction/normalization → persistence/result reporting. Cross-user tests must accompany each new data boundary rather than being postponed until the end.
 
-Business-rule references group around auth (S1-BR-001–006), ownership (007–010), secrets (011), targets (012–017), authorized ingestion (018–019), normalization/persistence (020–022), and outcomes/failure handling (023–026). The UI document additionally references 027 for CSV recovery. These are a navigation aid, not a reconstructed canonical rules document.
+Business-rule references group around auth (S1-BR-001–006), ownership (007–010), secrets (011), targets (012–017), authorized ingestion (018–019), normalization/persistence (020–022), and outcomes/failure handling (023–026). An earlier UI document version cited 027 for CSV recovery, but no Sprint 1 ticket references it. These are a navigation aid, not a reconstructed canonical rules document.
 
 ## 11. Branches, PRs, and unmerged work
 

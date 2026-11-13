@@ -59,12 +59,6 @@ export function getReviewSummary(base: string, targetId: string, token: string) 
   )
 }
 
-export function uploadReviews(base: string, targetId: string, token: string, csvText: string) {
-  return targetRequest<IngestionResultResponse>(
-    base, `/${encodeURIComponent(targetId)}/ingestions`, token, { csv_text: csvText },
-  )
-}
-
 export function collectGoogleMapsReviews(base: string, targetId: string, token: string) {
   return targetRequest<IngestionResultResponse>(
     base, `/${encodeURIComponent(targetId)}/ingestions/google-maps`, token, {},

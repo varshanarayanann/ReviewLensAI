@@ -43,5 +43,5 @@ it('opens the workspace for a newly created target', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Create target' }))
   expect(await screen.findByRole('heading', { name: 'Created business' })).toBeInTheDocument()
   expect(screen.getByText('Not ingested')).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: 'Upload reviews' })).toBeEnabled()
+  expect(screen.getByRole('button', { name: 'Ingest reviews' })).toBeEnabled()
 })

@@ -28,7 +28,7 @@ The goal: **ReviewLens must feel like one product, not 23 stories stitched toget
 | Backend | Python FastAPI (`/api/...`) | The UI talks only to our FastAPI backend, never to third-party review services directly |
 | Authentication | Supabase Auth | We build our own Log in / Register / Reset password screens using the Supabase client SDK; Supabase supplies the identity, sessions, and password reset |
 | Review platform | **Google Maps** | Platform is fixed; shown as a read-only `Google Maps` badge everywhere |
-| Ingestion | URL-initiated ingestion (primary) + CSV upload (secondary recovery path) | See Section 6.3 and Section 11 |
+| Ingestion | URL-initiated ingestion from the saved Google Maps URL (the only UI path; CSV upload was removed from the UI on 2026-11-13) | See Section 6.3 and Section 11 |
 | Icons | `lucide-react` | Only icon library allowed |
 | Deployment | Netlify (frontend), Render (backend) | No environment-specific URLs hard-coded in components |
 
@@ -173,18 +173,19 @@ controls. It submits one question to `POST /api/targets/{id}/questions`, shows
 progress and the current response, and keeps the question available for retry.
 
 **S2-020:** Offer the question form when the persisted review summary confirms
-that the active target has reviews. With zero reviews, show guidance to upload
-a CSV. After a failed import, use the persisted count to determine whether
+that the active target has reviews. With zero reviews, show guidance to use
+**Ingest reviews**. After a failed ingestion, use the persisted count to determine whether
 previously saved reviews are still available for Q&A.
 
 **Reviews tab layout (Sprint 1):**
 
 The current primary **Ingest reviews** action collects from the saved Google
-Maps URL through the backend. It disables collection and CSV upload while work
-is pending. CSV upload remains visible as a secondary action. See
+Maps URL through the backend. It disables collection and workspace refresh while
+work is pending. The workspace has no CSV upload; the CSV ingestion API remains
+for backend use and tests. See
 [Google Maps collection](../google-maps-ingestion.md) for setup and limits.
 
-1. **Ingestion panel**: latest ingestion state, the primary `Ingest reviews` action (from the source URL), the secondary `Upload a CSV instead` action, and the result message of the latest attempt.
+1. **Ingestion panel**: latest ingestion state, the primary `Ingest reviews` action (from the source URL), and the result message of the latest attempt.
 2. **Reviews panel**: persisted reviews for this target (`Reviews (N)` header + list), or an empty state if none.
 
 The analysis workspace's **Switch target** action (S2-017) lists the user's
@@ -323,11 +324,8 @@ The UI must distinguish these categories (technical spec Section 5.1). Never col
 | Authorization / not found | `403` or `404` on a target | `NotFoundState` inside the app shell | `We couldn't find that analysis target. It may have been deleted, or you may not have access to it.` |
 | Ingestion: source URL unusable / no reviews found | Ingestion run `failed` | Danger `Alert` in Ingestion panel + `Failed` badge | `We couldn't find reviews at this Google Maps link. Check that the link opens a business page with reviews.` |
 | Ingestion: review provider timeout | Ingestion run `failed` | Danger `Alert` in Ingestion panel | `Google Maps reviews took too long to load. Try again in a few minutes.` |
-| Ingestion: review provider unavailable | Ingestion run `failed` | Danger `Alert` in Ingestion panel | `We can't reach the review source right now. Try again later, or upload a CSV instead.` |
-| Ingestion: quota exhausted | Ingestion run `failed` | Warning `Alert` in Ingestion panel | `ReviewLens has reached its review-collection limit for now. Try again later, or upload a CSV instead.` |
-| CSV: wrong file type / too large / empty | `400` / `422` | Inline error under the file field | See Section 5.6 |
-| CSV: missing required columns | `422` | Danger `Alert` in Ingestion panel | `This CSV is missing required columns. It needs a "rating" column and a "review_text" column.` (see the S1-019 CSV contract) |
-| CSV: no valid rows | Ingestion run `failed` | Danger `Alert` in Ingestion panel | `None of the rows in this file had both a rating and review text, so nothing was imported.` |
+| Ingestion: review provider unavailable | Ingestion run `failed` | Danger `Alert` in Ingestion panel | `We can't reach the review source right now. Try again later.` |
+| Ingestion: quota exhausted | Ingestion run `failed` | Warning `Alert` in Ingestion panel | `ReviewLens has reached its review-collection limit for now. Try again later.` |
 | Network failure (offline) | Request never completes | Toast; keep current data on screen | `You appear to be offline. Check your connection and try again.` |
 | Unexpected application failure | `500` | Danger `Alert` at page or panel level | `Something went wrong on our side. Try again, and contact the team if it keeps happening.` |
 
@@ -360,22 +358,11 @@ Supabase errors are mapped; **never render the Supabase message string**:
 | Too many attempts | `Too many attempts. Wait a few minutes and try again.` |
 | Reset email sent | Success `Alert`: `If an account exists for that email, we've sent a password reset link.` (same message whether or not the email exists) |
 
-### 5.6 CSV upload field (secondary ingestion path)
+### 5.6 CSV upload field (removed)
 
-- Uses the `FileUploadField` component: label `Reviews CSV file`, a drop zone plus a `Choose file` button, `accept=".csv"`.
-- Helper text lists the expected format: `CSV with columns: rating (1-5), review_text. Optional: reviewer_name, review_date, review_url.` The exact column names must match the backend parser and the team's documented CSV format.
-
-> **S1-019 CSV contract:** See [CSV import format](../csv-import-format.md). Required columns are `rating` and `review_text`; the source is limited to 1,000,000 UTF-8 bytes and 1–1,000 records. Other named columns are accepted but are not currently persisted. Source-format rejection returns 422 before an attempt is recorded; invalid review values after source acceptance produce a recorded failed ingestion. Optional metadata persistence remains separate integration work.
-- After choosing a file, show the file name and size with a `Remove` ghost button before upload.
-- Client-side checks (backend re-validates):
-
-| Condition | Message |
-| --- | --- |
-| Not a `.csv` file | `Choose a .csv file.` |
-| File too large | `This file is larger than <max size>. Split it into smaller files.` (max size from configuration, defined in S1-008 / S1-020) |
-| Empty file | `This file is empty.` |
-
-- Primary action inside the upload area: `Upload reviews`, which becomes `Uploading...` while in progress.
+The workspace no longer offers CSV upload; Google Maps collection is the only
+ingestion path in the UI. The backend CSV endpoint and its
+[format contract](../csv-import-format.md) remain for API use and backend tests.
 
 ### 5.7 Where messages appear
 
@@ -425,9 +412,8 @@ Ingestion state is shown with the `StatusBadge` component, using exactly these l
 Ingestion panel behavior:
 
 - **Primary path, URL ingestion (S1-BR-019):** the `Ingest reviews` primary button starts ingestion from the target's saved Google Maps URL. The panel shows: `ReviewLens will collect reviews from this target's Google Maps page.`
-- **Secondary path, CSV upload (S1-BR-027):** a ghost button / link `Upload a CSV instead` expands the `FileUploadField` below the primary action. It is never the default, never the larger button, and is labelled as the fallback: `Use this if Google Maps reviews can't be collected right now.`
-- **While ingesting:** badge = `Ingesting`; both actions disabled; text `Collecting reviews from Google Maps. This can take up to a minute.` (or `Importing reviews from <file name>...`).
-- **On success:** success `Alert`: `Ingested <N> reviews from Google Maps.` (or `Imported <N> reviews from <file name>.`) plus timestamp. Reviews panel refreshes.
+- **While ingesting:** badge = `Ingesting`; `Ingest reviews` and `Refresh workspace` disabled; text `Collecting reviews from Google Maps. This can take up to a minute.`
+- **On success:** success `Alert`: `Ingested <N> reviews from Google Maps.` plus timestamp. Reviews panel refreshes.
 - **On partial success:** warning `Alert`: `Ingested <N> reviews. <M> records were skipped because they were missing a rating or review text.` Never present a partial run as fully successful.
 - **On failure:** danger/warning `Alert` with the mapped message from Section 5.4, timestamp, and a `Try again` button. Existing reviews remain visible.
 - Counts (`N`, `M`) always come from the backend's recorded IngestionRun, never from client-side guesses. Never show a success state unless the backend reported success.
@@ -443,14 +429,14 @@ Ingestion panel behavior:
 | --- | --- | --- |
 | **Primary** | Solid `--color-primary`, white text | The single main action of a page, form, or panel |
 | **Secondary** | White surface, `--color-border` border, `--color-text` text | Alternative actions (`Cancel`, `Back`) |
-| **Ghost** | No border/background until hover | Low-emphasis actions (`Upload a CSV instead`, overflow menu items) |
+| **Ghost** | No border/background until hover | Low-emphasis actions (overflow menu items) |
 | **Destructive** | Solid `--color-danger`, white text | Irreversible actions (delete), only inside a `ConfirmDialog` |
 | **Link** | Text in `--color-primary`, underline on hover | Navigation inside text |
 
 ### 7.2 Rules
 
 - **One primary button per view region** (page header, form, or panel).
-- Labels are **verb first, sentence case, specific**: `Create target`, `Ingest reviews`, `Upload reviews`, `Try again`, `Log out`. Avoid `Submit`, `OK`, `Yes`.
+- Labels are **verb first, sentence case, specific**: `Create target`, `Ingest reviews`, `Try again`, `Log out`. Avoid `Submit`, `OK`, `Yes`.
 - Sizes: default height 36px; small 32px (inside cards/tables); large 44px (auth pages and mobile primary actions). Minimum touch target 44x44px on mobile.
 - **Buttons perform actions; links navigate.** Do not use a button for navigation or a link for a mutation.
 - **Disabled buttons** must have a visible reason nearby (helper text or tooltip), e.g. `Ingestion is already running.`
@@ -478,7 +464,6 @@ Build these once in `frontend/src/components/ui/` (layout components in `fronten
 | `StatusBadge` | Ingestion state | Only states/labels from Section 6.3 |
 | `Button` | All buttons | Variants and sizes from Section 7; `loading` prop |
 | `TextField` | Label + input + helper + error | `aria-invalid`, `aria-describedby`, required marker; password variant with show/hide |
-| `FileUploadField` | CSV picker / drop zone | `.csv` only; shows selected file; inline errors |
 | `FormErrorSummary` | Top-of-form error banner | Focusable; summarizes errors |
 | `Alert` | Inline banner (success / info / warning / danger) | Icon + title + message + optional action |
 | `Toast` | Transient notifications | Single provider at app root; error toasts persist until dismissed |
@@ -507,7 +492,6 @@ Use these terms consistently in UI copy, code names, and docs:
 | Dashboard (the target list page) | Home, targets page |
 | Analysis workspace (or "workspace") | Details page, target page |
 | Ingest / ingestion (URL path) | Scrape, fetch, crawl |
-| Upload a CSV / import (CSV path only) | Ingest a file |
 | Review | Comment, feedback item |
 | Google Maps (the review platform) | Google, Maps, GMaps |
 | Google Maps URL / source URL | Link, endpoint |
@@ -533,8 +517,8 @@ Use these terms consistently in UI copy, code names, and docs:
 
 ## 11. Sprint Scope Guardrails for UI
 
-- **Sprint 1 UI covers:** log in / register / password reset, dashboard, create target, delete target, Analysis Workspace (Reviews tab), URL-initiated ingestion with status, CSV upload as a secondary path, persisted review list, and all error/empty/loading states in this document.
-- **URL ingestion is primary (S1-BR-019).** CSV upload is a recovery path only (S1-BR-027); a UI that offers only CSV upload does not satisfy S1-019.
+- **Sprint 1 UI covers:** log in / register / password reset, dashboard, create target, delete target, Analysis Workspace (Reviews tab), URL-initiated ingestion with status, persisted review list, and all error/empty/loading states in this document.
+- **URL ingestion is the ingestion path (S1-BR-019).** The UI no longer offers CSV upload; the backend CSV endpoint remains for API use and tests.
 - **Do not build Sprint 2+ UI in Sprint 1:** Summary tab, Ask/AI chat tab, rating charts or distributions, or disabled "coming soon" placeholders. The `POST /api/targets/{id}/ask` endpoint has no Sprint 1 UI.
 
 ---
@@ -580,3 +564,4 @@ When generating or modifying ReviewLens UI code:
 | --- | --- | --- |
 | 2026-10-26 | Amreen | Initial version (S1-002) |
 | 2026-10-26 | Amreen | Aligned with Sprint 1 Architecture Baseline: React + TypeScript, Supabase Auth screens, Google Maps platform, Dashboard naming, workspace tabs, CSV upload as secondary path, file locations |
+| 2026-11-13 | Amreen | Removed CSV upload from the workspace UI; Google Maps collection is the only UI ingestion path. The backend CSV API remains. |

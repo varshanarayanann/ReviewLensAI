@@ -41,7 +41,7 @@ it('collects from the saved source and reloads the persisted review summary', as
   }))
 })
 
-it('blocks simultaneous collection and CSV submission while the provider is pending', async () => {
+it('blocks repeated collection and refresh while the provider is pending', async () => {
   let complete!: (response: Response) => void
   const pending = new Promise<Response>((resolve) => { complete = resolve })
   const fetchMock = vi.fn((url: string) => url === endpoint
@@ -52,7 +52,7 @@ it('blocks simultaneous collection and CSV submission while the provider is pend
   fireEvent.click(button)
   fireEvent.click(button)
   expect(screen.getByRole('button', { name: 'Ingesting...' })).toBeDisabled()
-  expect(screen.getByRole('button', { name: 'Upload reviews' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Refresh workspace' })).toBeDisabled()
   expect(screen.getByText(MESSAGES.mapsCollectionBusy)).toBeInTheDocument()
   expect(fetchMock.mock.calls.filter(([url]) => url === endpoint)).toHaveLength(1)
   await act(async () => complete(json(result)))

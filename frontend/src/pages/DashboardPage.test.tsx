@@ -43,7 +43,7 @@ it('shows the name, platform, source, and workspace link from the owned target r
   fireEvent.click(link)
   expect(await screen.findByRole('heading', { name: target.name })).toBeInTheDocument()
   expect(screen.getByText('Not ingested')).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: 'Upload reviews' })).toBeEnabled()
+  expect(screen.getByRole('button', { name: 'Ingest reviews' })).toBeEnabled()
 })
 
 it('shows an actionable empty state', async () => {

@@ -37,11 +37,10 @@ function showWorkspace(path = '/targets/target-a', fake = createFakeAuth(fakeSes
   return fake
 }
 
-function chooseFile(name = 'reviews.csv', contents = 'rating,review_text\n5,Great') {
-  const file = new File([contents], name, { type: 'text/csv' })
-  Object.defineProperty(file, 'text', { value: vi.fn().mockResolvedValue(contents) })
-  fireEvent.change(screen.getByLabelText('Reviews CSV file *'), { target: { files: [file] } })
-  return file
+const collectUrl = 'http://api.test/api/targets/target-a/ingestions/google-maps'
+
+function ingestReviews() {
+  fireEvent.click(screen.getByRole('button', { name: 'Ingest reviews' }))
 }
 
 const questionsUrl = 'http://api.test/api/targets/target-a/questions'
@@ -176,7 +175,7 @@ it.each([[null, 'Not ingested'], [persistenceFailure, 'Failed']])(
     showWorkspace()
     expect(await screen.findByText(MESSAGES.questionNoReviews)).toBeInTheDocument()
     expect(screen.getByText(badge)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Upload reviews' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Ingest reviews' })).toBeEnabled()
     expect(screen.queryByRole('textbox', { name: 'Question *' })).not.toBeInTheDocument()
     expect(fetchMock.mock.calls.some(([url]) => url === questionsUrl)).toBe(false)
   },
@@ -185,7 +184,7 @@ it.each([[null, 'Not ingested'], [persistenceFailure, 'Failed']])(
 it('enables Q&A once the first successful import updates the persisted summary', async () => {
   let imported = false
   fetchMock.mockImplementation((url: string, options?: RequestInit) => {
-    if (url.endsWith('/ingestions') && options?.method === 'POST') {
+    if (url === collectUrl && options?.method === 'POST') {
       imported = true
       return Promise.resolve(json(succeeded))
     }
@@ -197,8 +196,7 @@ it('enables Q&A once the first successful import updates the persisted summary',
   })
   showWorkspace()
   expect(await screen.findByText(MESSAGES.questionNoReviews)).toBeInTheDocument()
-  chooseFile()
-  fireEvent.click(screen.getByRole('button', { name: 'Upload reviews' }))
+  ingestReviews()
   await enterQuestion()
   fireEvent.click(screen.getByRole('button', { name: 'Ask question' }))
   expect(await screen.findByText(answer.answer)).toBeInTheDocument()
@@ -226,7 +224,7 @@ it('loads the authorized target, real platform, source link, and no-run state', 
   expect(screen.getByText('Google Maps')).toBeInTheDocument()
   expect(screen.getByRole('link', { name: target.source_url })).toHaveAttribute('rel', 'noopener noreferrer')
   expect(screen.getByText('Not ingested')).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: 'Upload reviews' })).toBeEnabled()
+  expect(screen.getByRole('button', { name: 'Ingest reviews' })).toBeEnabled()
   expect(fetchMock).toHaveBeenNthCalledWith(1, 'http://api.test/api/targets/target-a', expect.objectContaining({
     headers: expect.objectContaining({ Authorization: 'Bearer test-access-token' }),
   }))
@@ -292,7 +290,7 @@ it('shows a loading state without an ingestion action while data is pending', as
   fetchMock.mockImplementation(() => new Promise(() => {}))
   showWorkspace()
   expect(await screen.findByLabelText('Loading workspace')).toHaveAttribute('aria-busy', 'true')
-  expect(screen.queryByRole('button', { name: 'Upload reviews' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Ingest reviews' })).not.toBeInTheDocument()
 })
 
 it.each([[403], [404]])('maps access response %s to the same safe unavailable state', async (status) => {
@@ -301,7 +299,7 @@ it.each([[403], [404]])('maps access response %s to the same safe unavailable st
   expect(await screen.findByRole('alert')).toHaveTextContent(MESSAGES.targetNotFound)
   expect(screen.queryByText(target.name)).not.toBeInTheDocument()
   expect(screen.queryByText('private raw detail')).not.toBeInTheDocument()
-  expect(screen.queryByRole('button', { name: 'Upload reviews' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Ingest reviews' })).not.toBeInTheDocument()
   expect(fetchMock).toHaveBeenCalledTimes(1)
 })
 
@@ -341,10 +339,13 @@ it.each([
   showWorkspace()
   expect(await screen.findByText(label)).toBeInTheDocument()
   expect(screen.getByText('Recorded result')).toBeInTheDocument()
-  if (state === 'processing') expect(screen.getByRole('button', { name: 'Upload reviews' })).toBeDisabled()
+  if (state === 'processing') {
+    expect(screen.getByRole('button', { name: 'Ingest reviews' })).toBeDisabled()
+    expect(screen.getByText(MESSAGES.ingestionBusy)).toBeInTheDocument()
+  }
 })
 
-it('uploads to the active target and displays the persisted result after refresh', async () => {
+it('collects for the active target and displays the persisted result after refresh', async () => {
   let saved = false
   fetchMock.mockImplementation((url: string, options?: RequestInit) => {
     if (options?.method === 'POST') { saved = true; return Promise.resolve(json(succeeded)) }
@@ -355,14 +356,11 @@ it('uploads to the active target and displays the persisted result after refresh
   })
   showWorkspace()
   await screen.findByRole('heading', { name: target.name })
-  chooseFile()
-  fireEvent.click(screen.getByRole('button', { name: 'Upload reviews' }))
+  ingestReviews()
   expect(await screen.findByText('Ingested')).toBeInTheDocument()
   expect(screen.getByRole('status')).toHaveClass('alert--success')
   expect(screen.getByRole('status')).toHaveTextContent('Imported 1 review; rejected 0 records.')
-  expect(fetchMock).toHaveBeenCalledWith('http://api.test/api/targets/target-a/ingestions', expect.objectContaining({
-    method: 'POST', body: JSON.stringify({ csv_text: 'rating,review_text\n5,Great' }),
-  }))
+  expect(fetchMock).toHaveBeenCalledWith(collectUrl, expect.objectContaining({ method: 'POST', body: '{}' }))
   expect(await screen.findByText('1 review')).toBeInTheDocument()
   expect(screen.getByText('5.0 / 5')).toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Refresh workspace' }))
@@ -383,8 +381,7 @@ it('shows partial ingestion counts with warning semantics', async () => {
   })
   showWorkspace()
   await screen.findByRole('heading', { name: target.name })
-  chooseFile()
-  fireEvent.click(screen.getByRole('button', { name: 'Upload reviews' }))
+  ingestReviews()
 
   const alert = await screen.findByRole('status')
   expect(alert).toHaveClass('alert--warning')
@@ -401,8 +398,7 @@ it('shows fully rejected content counts and failure semantics', async () => {
   )))
   showWorkspace()
   await screen.findByRole('heading', { name: target.name })
-  chooseFile()
-  fireEvent.click(screen.getByRole('button', { name: 'Upload reviews' }))
+  ingestReviews()
 
   const alert = await screen.findByRole('alert')
   expect(alert).toHaveClass('alert--danger')
@@ -416,8 +412,7 @@ it('shows a generic persistence failure when no content records were rejected', 
   )))
   showWorkspace()
   await screen.findByRole('heading', { name: target.name })
-  chooseFile()
-  fireEvent.click(screen.getByRole('button', { name: 'Upload reviews' }))
+  ingestReviews()
 
   const alert = await screen.findByRole('alert')
   expect(alert).toHaveClass('alert--danger')
@@ -439,8 +434,7 @@ it('restores the latest partial outcome and warning alert after workspace refres
   })
   showWorkspace()
   await screen.findByRole('heading', { name: target.name })
-  chooseFile()
-  fireEvent.click(screen.getByRole('button', { name: 'Upload reviews' }))
+  ingestReviews()
   expect(await screen.findByRole('status')).toHaveTextContent(partial.message)
 
   fireEvent.click(screen.getByRole('button', { name: 'Refresh workspace' }))
@@ -468,39 +462,13 @@ it('does not let an older summary request overwrite a post-ingestion summary', a
   })
   showWorkspace()
   await screen.findByRole('heading', { name: target.name })
-  chooseFile()
-  fireEvent.click(screen.getByRole('button', { name: 'Upload reviews' }))
+  ingestReviews()
   expect(await screen.findByText('1 review')).toBeInTheDocument()
   await act(async () => resolveInitialSummary(json(emptySummary)))
 
   expect(screen.getByText('1 review')).toBeInTheDocument()
   expect(screen.getByText('5.0 / 5')).toBeInTheDocument()
   expect(summaryRequests).toBe(2)
-})
-
-it('validates and focuses the file input without sending invalid CSV selections', async () => {
-  showWorkspace()
-  await screen.findByRole('heading', { name: target.name })
-  chooseFile('reviews.txt')
-  fireEvent.click(screen.getByRole('button', { name: 'Upload reviews' }))
-  expect(screen.getByRole('alert')).toHaveTextContent(MESSAGES.csvFile)
-  expect(screen.getByLabelText('Reviews CSV file *')).toHaveFocus()
-  expect(fetchMock.mock.calls.filter(([, options]) => options?.method === 'POST')).toHaveLength(0)
-})
-
-it('maps rejected CSV sources to safe guidance and retains the selected file', async () => {
-  fetchMock.mockImplementation((url: string, options?: RequestInit) => Promise.resolve(
-    options?.method === 'POST'
-      ? json({ detail: 'private parser detail' }, 422)
-      : json(defaultResponse(url)),
-  ))
-  showWorkspace()
-  await screen.findByRole('heading', { name: target.name })
-  const file = chooseFile()
-  fireEvent.submit(screen.getByRole('button', { name: 'Upload reviews' }).closest('form')!)
-  expect(await screen.findByRole('alert')).toHaveTextContent(MESSAGES.csvFormat)
-  expect(screen.queryByText('private parser detail')).not.toBeInTheDocument()
-  expect(screen.getByLabelText('Reviews CSV file *')).toHaveProperty('files', [file])
 })
 
 it('keeps the authorized target context on a failed import', async () => {
@@ -511,11 +479,10 @@ it('keeps the authorized target context on a failed import', async () => {
   )))
   showWorkspace()
   await screen.findByRole('heading', { name: target.name })
-  chooseFile()
-  fireEvent.click(screen.getByRole('button', { name: 'Upload reviews' }))
+  ingestReviews()
   expect(await screen.findByText('Failed')).toBeInTheDocument()
   expect(screen.getByRole('heading', { name: target.name })).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: 'Upload reviews' })).toBeEnabled()
+  expect(screen.getByRole('button', { name: 'Ingest reviews' })).toBeEnabled()
   expect(screen.getByText('2 reviews')).toBeInTheDocument()
   expect(screen.getByText('4.0 / 5')).toBeInTheDocument()
   expect(fetchMock.mock.calls.filter(([url]) => url.endsWith('/reviews/summary'))).toHaveLength(1)
@@ -548,8 +515,7 @@ it('restores a failed ingestion result after refreshing the workspace', async ()
   showWorkspace()
   await screen.findByRole('heading', { name: target.name })
 
-  chooseFile()
-  fireEvent.click(screen.getByRole('button', { name: 'Upload reviews' }))
+  ingestReviews()
 
   expect(await screen.findByText('Failed')).toBeInTheDocument()
 
@@ -561,47 +527,47 @@ it('restores a failed ingestion result after refreshing the workspace', async ()
   expect(screen.getByText('No ratings yet')).toBeInTheDocument()
 })
 
-it('blocks duplicate imports while a submission is pending', async () => {
-  fetchMock.mockImplementation((url: string, options?: RequestInit) => options?.method === 'POST'
+it('blocks duplicate collection while a request is pending', async () => {
+  fetchMock.mockImplementation((url: string) => url === collectUrl
     ? new Promise(() => {}) : Promise.resolve(json(defaultResponse(url))))
   showWorkspace()
   await screen.findByRole('heading', { name: target.name })
-  chooseFile()
-  fireEvent.click(screen.getByRole('button', { name: 'Upload reviews' }))
-  expect(await screen.findByRole('button', { name: 'Uploading...' })).toBeDisabled()
+  ingestReviews()
+  expect(await screen.findByRole('button', { name: 'Ingesting...' })).toBeDisabled()
   expect(screen.getByRole('button', { name: 'Refresh workspace' })).toBeDisabled()
-  await waitFor(() => expect(fetchMock.mock.calls.filter(([, options]) => options?.method === 'POST')).toHaveLength(1))
+  await waitFor(() => expect(fetchMock.mock.calls.filter(([url]) => url === collectUrl)).toHaveLength(1))
 })
 
 it.each([
-  [401, MESSAGES.sessionEnded], [403, MESSAGES.targetNotFound],
-  [422, MESSAGES.csvFormat], [500, MESSAGES.unexpected],
-])('handles upload response %s without exposing raw details', async (status, message) => {
-  fetchMock.mockImplementation((url: string, options?: RequestInit) => Promise.resolve(
-    options?.method === 'POST' ? json({ detail: 'sensitive upload error' }, status)
+  [401, MESSAGES.sessionEnded], [403, MESSAGES.targetNotFound], [500, MESSAGES.mapsCollectionFailed],
+])('handles collection response %s without exposing raw details', async (status, message) => {
+  fetchMock.mockImplementation((url: string) => Promise.resolve(
+    url === collectUrl ? json({ detail: 'sensitive collection error' }, status)
       : json(defaultResponse(url)),
   ))
   showWorkspace()
   await screen.findByRole('heading', { name: target.name })
-  chooseFile()
-  fireEvent.click(screen.getByRole('button', { name: 'Upload reviews' }))
+  ingestReviews()
   expect(await screen.findByText(message)).toBeInTheDocument()
-  expect(screen.queryByText('sensitive upload error')).not.toBeInTheDocument()
-  if (status === 403) expect(screen.queryByRole('button', { name: 'Upload reviews' })).not.toBeInTheDocument()
+  expect(screen.queryByText('sensitive collection error')).not.toBeInTheDocument()
+  if (status === 403) expect(screen.queryByRole('button', { name: 'Ingest reviews' })).not.toBeInTheDocument()
 })
 
-it('does not submit an old file after navigating away during its read', async () => {
+it('ignores a collection result that arrives after navigating to another target', async () => {
+  let complete!: (response: Response) => void
+  fetchMock.mockImplementation((url: string) => {
+    if (url === collectUrl) return new Promise<Response>((resolve) => { complete = resolve })
+    if (url.endsWith('/target-b')) return Promise.resolve(json({ ...target, id: 'target-b', name: 'Second Cafe' }))
+    return Promise.resolve(json(defaultResponse(url)))
+  })
   showWorkspace()
   await screen.findByRole('heading', { name: target.name })
-  const file = new File(['rating,review_text\n5,Great'], 'reviews.csv')
-  let resolveText!: (text: string) => void
-  Object.defineProperty(file, 'text', { value: () => new Promise<string>((resolve) => { resolveText = resolve }) })
-  fireEvent.change(screen.getByLabelText('Reviews CSV file *'), { target: { files: [file] } })
-  fireEvent.click(screen.getByRole('button', { name: 'Upload reviews' }))
+  ingestReviews()
   fireEvent.click(screen.getByRole('link', { name: 'Open another target' }))
-  await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('http://api.test/api/targets/target-b', expect.anything()))
-  await act(async () => resolveText('rating,review_text\n5,Great'))
-  expect(fetchMock.mock.calls.some(([, options]) => options?.method === 'POST')).toBe(false)
+  expect(await screen.findByRole('heading', { name: 'Second Cafe' })).toBeInTheDocument()
+  await act(async () => complete(json(succeeded)))
+  expect(screen.queryByText(succeeded.message)).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Ingest reviews' })).toBeEnabled()
 })
 
 it('clears the old context when navigating to a different target and ignores late responses', async () => {

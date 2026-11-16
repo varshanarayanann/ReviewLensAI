@@ -1,4 +1,6 @@
 export const MESSAGES = {
+  targetDeleteFailed: 'The analysis target could not be deleted. Try again.',
+  targetDeleteBusy: 'Reviews are being collected. Wait for ingestion to finish, then try deleting the target again.',
   questionRequired: 'Enter a question about the reviews.',
   questionTooLong: 'Use 1,000 characters or fewer.',
   questionUnavailable: 'ReviewLens could not answer right now. Try again shortly.',

@@ -336,6 +336,20 @@ and navigation after target creation work without it.
 The original S1-018 author can integrate the completed feature and update her
 existing draft PR using [the handoff instructions](docs/handoffs/s1-018-workspace.md).
 
+### Delete an analysis target
+
+Open **Target actions → Delete target** in the workspace. The confirmation names
+the target and initially focuses Cancel. Confirming permanently deletes the target,
+its reviews, and its ingestion history, then returns to the dashboard.
+
+`DELETE /api/targets/{target_id}` requires verified authentication and checks the
+owner before changing records. Missing and other users' targets both return 404.
+Deletion commits all three tables together and returns an empty 204 response;
+database failures roll back and return a safe 503. A processing run started within
+the last three minutes blocks deletion with 409, covering the provider's bounded
+collection timeout. Older abandoned processing runs can be removed with the
+target. No schema migration is required.
+
 ## Review Q&A and its test harness (S2-003)
 
 `POST /api/targets/{target_id}/questions` accepts `{"question": "..."}` and answers

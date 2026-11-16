@@ -5,6 +5,7 @@ import { Alert } from '../components/ui/Alert'
 import { ReviewQuestionPanel } from '../components/workspace/ReviewQuestionPanel'
 import { AnalysisTargetWorkspaceView, type AnalysisTargetWorkspaceState, type ReviewSummaryState } from '../components/workspace/AnalysisTargetWorkspaceView'
 import { WorkspaceTargetSwitcher } from '../components/workspace/WorkspaceTargetSwitcher'
+import { DeleteTargetAction } from '../components/workspace/DeleteTargetAction'
 import { ApiError, collectGoogleMapsReviews, getReviewSummary, getWorkspace, type IngestionResultResponse } from '../lib/api/client'
 import { useAuth } from '../lib/auth/AuthContext'
 import { MESSAGES } from '../lib/messages'
@@ -135,6 +136,9 @@ function Workspace({ apiBaseUrl, targetId, token }: { apiBaseUrl: string; target
               : result.state === 'processing' ? 'info' : 'success'
         }>{result.message}</Alert>}
       </section>
+      {state.kind === 'ready' && <DeleteTargetAction apiBaseUrl={apiBaseUrl} targetId={targetId}
+        targetName={state.target.name} token={token} disabled={collecting}
+        onAccessDenied={() => setState({ kind: 'missing' })} />}
     </AnalysisTargetWorkspaceView>
     {state.kind !== 'loading' && state.kind !== 'missing' && state.kind !== 'forbidden' && <button
       className="button button--secondary workspace-refresh" disabled={collecting} onClick={refresh}>Refresh workspace</button>}

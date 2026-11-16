@@ -2,6 +2,11 @@
 
 ## Google Maps ingestion update
 
+Target workspaces also expose **Target actions → Delete target** with a native
+confirmation dialog. `DELETE /api/targets/{target_id}` checks verified ownership
+and atomically removes reviews, ingestion runs, and the target. Recent processing
+runs block deletion with 409; see README for the three-minute stale-run policy.
+
 The workspace's primary ingestion action uses the saved Google Maps URL through
 Apify's Compass review actor. Configure `APIFY_API_TOKEN` in backend/.env.
 Defaults are 20 reviews and a USD 0.10 provider cap per run. Ownership is checked

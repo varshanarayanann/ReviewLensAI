@@ -76,6 +76,15 @@ export async function getTargets(
   return (await response.json()) as AnalysisTargetResponse[]
 }
 
+export async function deleteTarget(base: string, targetId: string, token: string, signal: AbortSignal): Promise<void> {
+  const response = await fetch(`${base}/api/targets/${encodeURIComponent(targetId)}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+    signal,
+  })
+  if (!response.ok) throw new ApiError(response.status)
+}
+
 export class ApiError extends Error {
   readonly status: number
 

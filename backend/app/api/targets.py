@@ -1,11 +1,12 @@
 import logging
 from collections.abc import Callable, Mapping
+from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 import fastapi
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -52,6 +53,54 @@ def owned(target_id: UUID, user: CurrentUser, db: Session) -> AnalysisTarget:
     if target is None:
         raise HTTPException(404, "Analysis target not found.")
     return target
+
+
+@router.delete("/{target_id}", status_code=204)
+def delete_target(
+    target_id: UUID,
+    user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        target = db.scalar(
+            select(AnalysisTarget)
+            .where(
+                AnalysisTarget.id == target_id,
+                AnalysisTarget.owner_id == UUID(user.id),
+            )
+            .with_for_update()
+        )
+        if target is None:
+            raise HTTPException(404, "Analysis target not found.")
+        # The provider is bounded to 135 seconds. Protect a current attempt,
+        # while allowing cleanup of abandoned runs after a crashed process.
+        active_run = db.scalar(
+            select(IngestionRun.id).where(
+                IngestionRun.target_id == target_id,
+                IngestionRun.state == "processing",
+                IngestionRun.created_at > datetime.now(UTC) - timedelta(minutes=3),
+            )
+        )
+        if active_run is not None:
+            raise HTTPException(
+                409, "Reviews are being collected. Try deleting the target later."
+            )
+        db.execute(delete(Review).where(Review.target_id == target_id))
+        db.execute(delete(IngestionRun).where(IngestionRun.target_id == target_id))
+        db.execute(delete(AnalysisTarget).where(AnalysisTarget.id == target_id))
+        db.commit()
+    except SQLAlchemyError as exc:
+        try:
+            db.rollback()
+        except SQLAlchemyError as rollback_error:
+            logger.error(
+                "Target deletion rollback failed (%s)", type(rollback_error).__name__
+            )
+        logger.warning("Target %s deletion failed (%s)", target_id, type(exc).__name__)
+        raise HTTPException(
+            503, "The analysis target could not be deleted. Try again shortly."
+        ) from None
+    return Response(status_code=204)
 
 
 @router.get("/{target_id}/reviews", response_model=list[ReviewResponse])

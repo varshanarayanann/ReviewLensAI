@@ -1,5 +1,9 @@
 # ReviewLens AI — Project Context and Agent Guide
 
+JWT timestamp validation uses a fixed five-second clock-skew allowance for
+`iat`, `nbf`, and `exp`. Larger future timestamps and expired tokens outside
+that window remain rejected. Supabase session checking still applies.
+
 ## Google Maps ingestion update
 
 The workspace's primary ingestion action uses the saved Google Maps URL through

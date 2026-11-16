@@ -1,4 +1,5 @@
 import time
+from datetime import datetime, timezone
 
 import jwt
 import pytest
@@ -15,6 +16,54 @@ from tests.conftest import (
     StaticJWKClient,
     TokenFactory,
 )
+
+
+@pytest.fixture
+def jwt_clock(monkeypatch):
+    now = int(time.time())
+
+    class FixedDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime.fromtimestamp(now, timezone.utc).astimezone(tz)
+
+    monkeypatch.setattr(jwt.api_jwt, "datetime", FixedDateTime)
+    return now
+
+
+@pytest.mark.parametrize("claim", ["iat", "nbf"])
+@pytest.mark.parametrize("offset,accepted", [(2, True), (5, True), (6, False)])
+def test_small_clock_skew_is_bounded(
+    client, make_token, session_checker, jwt_clock, claim, offset, accepted
+):
+    token = make_token(**{claim: jwt_clock + offset, "exp": jwt_clock + 3600})
+    response = client.get("/api/me", headers=auth_header(token))
+    if accepted:
+        assert response.status_code == 200
+        assert session_checker.checked_tokens == [token]
+    else:
+        assert_unauthenticated(response)
+        assert session_checker.checked_tokens == []
+
+
+@pytest.mark.parametrize("age,accepted", [(4, True), (5, False), (60, False)])
+def test_expiration_tolerance_is_also_limited(
+    client, make_token, jwt_clock, age, accepted
+):
+    token = make_token(iat=jwt_clock - 3600, exp=jwt_clock - age)
+    response = client.get("/api/me", headers=auth_header(token))
+    if accepted:
+        assert response.status_code == 200
+    else:
+        assert_unauthenticated(response)
+
+
+def test_clock_skew_does_not_allow_revoked_sessions(
+    client, make_token, session_checker, jwt_clock
+):
+    token = make_token(iat=jwt_clock + 2, exp=jwt_clock + 3600)
+    session_checker.revoked_tokens.add(token)
+    assert_unauthenticated(client.get("/api/me", headers=auth_header(token)))
 
 
 def auth_header(token: str) -> dict[str, str]:

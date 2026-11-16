@@ -7,6 +7,7 @@ import jwt
 
 SUPABASE_AUDIENCE = "authenticated"
 ALLOWED_ALGORITHMS = ["ES256", "RS256"]
+TOKEN_CLOCK_SKEW_SECONDS = 5
 
 
 @dataclass(frozen=True)
@@ -91,6 +92,8 @@ class TokenVerifier:
                 algorithms=ALLOWED_ALGORITHMS,
                 audience=SUPABASE_AUDIENCE,
                 issuer=self._issuer,
+                # Allow small issuer/server clock differences on JWT timestamps.
+                leeway=TOKEN_CLOCK_SKEW_SECONDS,
                 options={"require": ["exp", "sub", "aud", "iss"]},
             )
         except jwt.PyJWKClientConnectionError as exc:

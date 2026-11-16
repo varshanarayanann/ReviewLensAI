@@ -44,7 +44,7 @@ def test_collect_uses_saved_url_and_fixed_authenticated_endpoint(monkeypatch):
     assert timeout == 135
     assert json.loads(request.data) == {
         "startUrls": [{"url": SOURCE}],
-        "maxReviews": 20,
+        "maxReviews": 100,
         "reviewsSort": "newest",
         "reviewsOrigin": "google",
         "personalData": False,

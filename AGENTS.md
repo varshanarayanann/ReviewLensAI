@@ -9,7 +9,9 @@ runs block deletion with 409; see README for the three-minute stale-run policy.
 
 The workspace's primary ingestion action uses the saved Google Maps URL through
 Apify's Compass review actor. Configure `APIFY_API_TOKEN` in backend/.env.
-Defaults are 20 reviews and a USD 0.10 provider cap per run. Ownership is checked
+Defaults are 100 records and a USD 0.10 provider cap per run. Rating-only Google
+Maps records with valid ratings are persisted with empty text and included in
+rating summaries. Q&A must not infer written evidence from empty text. Ownership is checked
 before collection, and records use the same normalization and persistence
 path as CSV. See [Google Maps collection](docs/google-maps-ingestion.md).
 This supersedes older statements below that URL collection is unimplemented.

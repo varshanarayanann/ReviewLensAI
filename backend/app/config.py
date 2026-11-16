@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     llm_base_url: str | None = Field(default=None, pattern=r"^https://[^\s/]+")
     llm_model: str | None = Field(default=None, min_length=1)
     apify_api_token: SecretStr | None = None
-    review_max_per_run: int = Field(default=20, ge=1, le=1000)
+    review_max_per_run: int = Field(default=100, ge=1, le=1000)
     review_max_charge_usd: float = Field(default=0.10, gt=0, le=5)
 
     @field_validator("cors_origins", mode="before")

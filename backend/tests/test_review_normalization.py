@@ -60,6 +60,38 @@ def test_rejects_blank_review_text() -> None:
     assert result.rejected[0].reason is ReviewRejectionReason.BLANK_REVIEW_TEXT
 
 
+@pytest.mark.parametrize(
+    "record",
+    [
+        {"rating": 4},
+        {"review_text": None, "rating": 4},
+        {"review_text": "", "rating": 4},
+        {"review_text": " \t ", "rating": 4},
+    ],
+)
+def test_rating_only_mode_preserves_rating_without_inventing_text(record):
+    result = normalize_reviews([record], allow_rating_only=True)
+    assert result.reviews == (NormalizedReview(review_text="", rating=4),)
+    assert result.rejected == ()
+
+
+@pytest.mark.parametrize(
+    "record",
+    [
+        {"review_text": "", "rating": 6},
+        {"review_text": "", "rating": True},
+        {"review_text": "", "rating": 4.5},
+        {"review_text": ""},
+        {"review_text": 123, "rating": 4},
+        None,
+    ],
+)
+def test_rating_only_mode_still_rejects_malformed_values(record):
+    result = normalize_reviews([record], allow_rating_only=True)
+    assert not result.reviews
+    assert len(result.rejected) == 1
+
+
 def test_rejects_missing_rating() -> None:
     result = normalize_reviews([{"review_text": "Good"}])
 

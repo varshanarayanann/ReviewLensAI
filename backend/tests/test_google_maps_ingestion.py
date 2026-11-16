@@ -36,7 +36,7 @@ def test_owned_url_is_collected_normalized_and_persisted(
     headers, target = source_targets[0]
     source.collect.return_value = [
         {"review_text": "  Good coffee  ", "rating": 5},
-        {"review_text": "", "rating": 2},
+        {"review_text": "", "rating": 9},
     ]
     response = request_collection(client, headers, target)
     assert response.status_code == 200

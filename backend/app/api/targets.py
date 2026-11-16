@@ -192,7 +192,9 @@ def ingest_google_maps(
         raise HTTPException(
             503, "Google Maps collection is unavailable. Upload a CSV instead."
         )
-    return persist_ingestion(db, target, lambda: source.collect(target.source_url))
+    return persist_ingestion(
+        db, target, lambda: source.collect(target.source_url), allow_rating_only=True
+    )
 
 
 @router.post("/{target_id}/ingestions", response_model=IngestionResult)
@@ -221,6 +223,7 @@ def persist_ingestion(
     load_records: Callable[[], list[object]],
     *,
     csv_ratings: bool = False,
+    allow_rating_only: bool = False,
 ) -> IngestionResult:
     target_id = target.id
     run = IngestionRun(target_id=target.id)
@@ -251,7 +254,9 @@ def persist_ingestion(
                     record["rating"] = None
             route_records.append(record)
 
-        normalized = normalize_reviews(route_records)
+        normalized = normalize_reviews(
+            route_records, allow_rating_only=allow_rating_only
+        )
         rows = [
             Review(
                 target_id=target.id,

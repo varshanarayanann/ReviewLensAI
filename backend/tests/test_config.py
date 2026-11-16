@@ -17,7 +17,7 @@ def settings_with(**overrides: object):
 
 def test_google_maps_settings_are_bounded_and_secret():
     settings = settings_with(apify_api_token="secret-apify-test")
-    assert settings.review_max_per_run == 20
+    assert settings.review_max_per_run == 100
     assert settings.review_max_charge_usd == 0.10
     assert "secret-apify-test" not in repr(settings)
     for overrides in (

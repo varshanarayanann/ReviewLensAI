@@ -250,7 +250,7 @@ The committed `.env.example` files list every required name. Never commit secret
 | `LLM_BASE_URL` | No | HTTPS base URL of another Responses-API-compatible provider, e.g. `https://api.x.ai/v1` for xAI Grok. Unset means OpenAI |
 | `LLM_MODEL` | No | Model name for the provider, e.g. `grok-4.7`. Unset means `gpt-5.6-terra` |
 | `APIFY_API_TOKEN` | No | Server-side secret enabling direct Google Maps collection through the Compass actor |
-| `REVIEW_MAX_PER_RUN` | No | Google Maps review limit per collection, defaults to 20, maximum 1,000 |
+| `REVIEW_MAX_PER_RUN` | No | Google Maps record limit per collection, defaults to 100, maximum 1,000 |
 | `REVIEW_MAX_CHARGE_USD` | No | Maximum Apify charge per attempt, defaults to USD 0.10, maximum USD 5 |
 
 The backend refuses to start and names the missing variables if a required value is absent.

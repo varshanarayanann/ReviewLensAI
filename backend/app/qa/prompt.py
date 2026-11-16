@@ -21,6 +21,10 @@ def build_system_prompt(target: AnalysisTarget) -> str:
         "- Use ratings alongside review text when relevant. If reviews disagree "
         "or describe both positive and negative experiences, represent both "
         "without overstating consensus.\n"
+        "- Some records contain only a rating and empty text. Include their "
+        "ratings in rating-based analysis, but never infer reasons or written "
+        "themes from them. If no written evidence supports a requested theme, "
+        'use "insufficient_evidence".\n'
         "- Ground conclusions in concrete review details and attribute "
         "subjective experiences to reviewers. Do not infer causes or generalize "
         "beyond this target and its supplied reviews.\n"

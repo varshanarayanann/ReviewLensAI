@@ -1,12 +1,9 @@
-"""Normalize raw Google Maps review records for the application.
+"""Normalize Google Maps and CSV review records for the application.
 
-The source contract is not finalized. This adapter currently expects
-``review_text`` and ``rating`` fields; ratings are assumed to be whole-star
-values from 1 through 5, accepting numeric strings for CSV-style inputs.
-Every other input field is retained unchanged in ``source_metadata``, including
-known optional fields such as ``source_review_id``, ``reviewer_name``,
-``review_date``, and ``review_url``. Confirm these names and the rating scale
-with the team when the ingestion source and canonical Review contract are set.
+Ratings must be whole-star values from 1 through 5, accepting numeric strings
+for CSV-style inputs. Google Maps ingestion enables rating-only records;
+CSV callers require nonblank written text. Other fields are retained unchanged
+in source_metadata for downstream use.
 """
 
 from collections.abc import Iterable, Mapping
@@ -44,13 +41,19 @@ class ReviewNormalizationResult:
     rejected: tuple[RejectedReview, ...]
 
 
-def normalize_reviews(records: Iterable[object]) -> ReviewNormalizationResult:
-    """Normalize each record independently and report invalid records by index."""
+def normalize_reviews(
+    records: Iterable[object], *, allow_rating_only: bool = False
+) -> ReviewNormalizationResult:
+    """Normalize records independently, optionally allowing rating-only data.
+
+    Google Maps collection opts in. CSV callers keep requiring written text.
+    Empty text is preserved as an empty string, never a fabricated comment.
+    """
     normalized: list[NormalizedReview] = []
     rejected: list[RejectedReview] = []
 
     for index, record in enumerate(records):
-        review, reason = _normalize_record(record)
+        review, reason = _normalize_record(record, allow_rating_only=allow_rating_only)
         if review is None:
             rejected.append(RejectedReview(index=index, reason=reason))
         else:
@@ -63,19 +66,21 @@ def normalize_reviews(records: Iterable[object]) -> ReviewNormalizationResult:
 
 
 def _normalize_record(
-    record: object,
+    record: object, *, allow_rating_only: bool = False
 ) -> tuple[NormalizedReview | None, ReviewRejectionReason | None]:
     if not isinstance(record, Mapping):
         return None, ReviewRejectionReason.INVALID_RECORD
 
-    if "review_text" not in record:
+    if "review_text" not in record and not allow_rating_only:
         return None, ReviewRejectionReason.MISSING_REVIEW_TEXT
 
-    raw_text = record["review_text"]
+    raw_text = record.get("review_text")
+    if raw_text is None and allow_rating_only:
+        raw_text = ""
     if not isinstance(raw_text, str):
         return None, ReviewRejectionReason.INVALID_REVIEW_TEXT
     review_text = raw_text.strip()
-    if not review_text:
+    if not review_text and not allow_rating_only:
         return None, ReviewRejectionReason.BLANK_REVIEW_TEXT
 
     if "rating" not in record:

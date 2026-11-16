@@ -15,7 +15,7 @@ Add these settings to the ignored `backend/.env` file, then restart the backend:
 
 ```dotenv
 APIFY_API_TOKEN=your-apify-token
-REVIEW_MAX_PER_RUN=20
+REVIEW_MAX_PER_RUN=100
 REVIEW_MAX_CHARGE_USD=0.10
 ```
 
@@ -35,7 +35,7 @@ managed in Apify.
    Valid text/rating records use the existing normalizer and persistence path.
    Invalid records are rejected and counted. Failed collection retains saved reviews.
 5. Successful collection refreshes the persisted summary and enables Q&A when
-   written reviews are available.
+   saved ratings or written reviews are available.
 
 Collection runs synchronously. The actor has a 120-second runtime limit, and
 the HTTP call has a 135-second timeout. The response is limited to 4 MB.
@@ -43,10 +43,16 @@ Responses exceeding the configured review count are rejected. A provider
 timeout, malformed response, or collection failure records a failed run.
 An empty response also records failure with zero saved reviews.
 
-The default limit is 20 reviews, configurable from 1 to 1,000. The default
+The default limit is 100 records, configurable from 1 to 1,000. The default
 provider spending cap is USD 0.10 per attempt, configurable up to USD 5.
-The actor may return fewer reviews. Star-only reviews are rejected because
-ReviewLens requires written review text. Repeated imports append records,
+The actor may return fewer records because of availability, runtime, or spending
+limits. Google Maps records with a valid whole-number rating from 1 to 5 are
+accepted even when text is absent, null, empty, or whitespace-only. Empty text
+is stored as an empty string. These records contribute to counts and average
+ratings, and enter Q&A as ratings without written evidence. The prompt forbids
+inferring reasons or themes from blank comments. Invalid ratings and non-string
+text values are still rejected. CSV import retains its written-text requirement.
+Repeated imports append records,
 matching CSV behavior. Re-importing the same place can produce duplicates.
 Avoid repeated collection against the shared demo targets.
 

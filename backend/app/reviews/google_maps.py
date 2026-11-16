@@ -27,7 +27,7 @@ class NoRedirects(HTTPRedirectHandler):
 
 class ApifyReviewSource:
     def __init__(
-        self, token: SecretStr | None, max_reviews: int = 20, max_charge: float = 0.10
+        self, token: SecretStr | None, max_reviews: int = 100, max_charge: float = 0.10
     ):
         self.token = token
         self.max_reviews = max_reviews

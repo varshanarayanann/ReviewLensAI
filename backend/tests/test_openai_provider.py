@@ -91,6 +91,32 @@ def test_openai_adapter_sends_question_and_reviews_as_json_and_parses_reply(
     assert answer.text == "Reviewers praise the friendly staff."
 
 
+def test_adapter_uses_configured_compatible_provider(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    responses = FakeResponses(
+        '{"outcome":"answered","answer":"Reviewers praise the staff."}'
+    )
+    client_options = {}
+    monkeypatch.setattr(
+        openai_provider,
+        "OpenAI",
+        lambda **kwargs: (
+            client_options.update(kwargs) or FakeOpenAI(responses, **kwargs)
+        ),
+    )
+
+    adapter = openai_provider.OpenAIReviewLLM(
+        "test-key",
+        base_url="https://api.groq.com/openai/v1",
+        model="openai/gpt-oss-120b",
+    )
+    adapter.complete(make_request())
+
+    assert client_options["base_url"] == "https://api.groq.com/openai/v1"
+    assert responses.arguments["model"] == "openai/gpt-oss-120b"
+
+
 def test_adapter_request_is_accepted_by_the_openai_sdk(
     monkeypatch: pytest.MonkeyPatch,
 ):
@@ -158,7 +184,7 @@ def test_provider_failure_becomes_safe_unavailable_error(
     with pytest.raises(LLMUnavailableError) as exc_info:
         openai_provider.OpenAIReviewLLM("test-key").complete(make_request())
 
-    assert str(exc_info.value) == "OpenAI request failed."
+    assert str(exc_info.value) == "LLM provider request failed."
     assert "sensitive provider details" not in str(exc_info.value)
 
 
@@ -186,7 +212,7 @@ def test_missing_provider_text_is_unavailable(
         lambda **kwargs: FakeOpenAI(responses, **kwargs),
     )
 
-    with pytest.raises(LLMUnavailableError, match="OpenAI returned no text"):
+    with pytest.raises(LLMUnavailableError, match="LLM provider returned no text"):
         openai_provider.OpenAIReviewLLM("test-key").complete(make_request())
 
 
@@ -234,7 +260,11 @@ def test_manual_evaluation_factory_uses_the_configured_key(
     monkeypatch.setattr(
         openai_provider,
         "get_settings",
-        lambda: provider_settings(SecretStr("test-key")),
+        lambda: provider_settings(
+            SecretStr("test-key"),
+            "https://api.groq.com/openai/v1",
+            "openai/gpt-oss-120b",
+        ),
     )
     monkeypatch.setattr(
         openai_provider,
@@ -242,7 +272,11 @@ def test_manual_evaluation_factory_uses_the_configured_key(
         lambda **kwargs: FakeOpenAI(responses, **kwargs),
     )
 
-    assert isinstance(openai_provider.create_client(), openai_provider.OpenAIReviewLLM)
+    client = openai_provider.create_client()
+
+    assert isinstance(client, openai_provider.OpenAIReviewLLM)
+    assert client._client.kwargs["base_url"] == "https://api.groq.com/openai/v1"
+    assert client._model == "openai/gpt-oss-120b"
 
 
 def test_configured_compatible_provider_receives_requests_and_model(

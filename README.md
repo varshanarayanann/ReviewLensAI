@@ -64,7 +64,7 @@ Copy-Item .env.example .env            # macOS/Linux: cp .env.example .env
 ```
 
 Edit `frontend/.env` and fill in the Supabase values. Change `VITE_API_BASE_URL`
-if your backend does not run on `http://localhost:8000`.
+if your backend does not run on `http://localhost:8010`.
 
 ### 3. Supabase Auth
 
@@ -91,12 +91,12 @@ stores passwords. One team member sets up the shared Supabase project:
 
 Use two terminals.
 
-**Terminal 1 - backend** (http://localhost:8000, API docs at http://localhost:8000/docs):
+**Terminal 1 - backend** (http://localhost:8010, API docs at http://localhost:8010/docs):
 
 ```powershell
 cd backend
 .\.venv\Scripts\Activate.ps1
-uvicorn app.main:create_app --factory --reload --port 8000
+uvicorn app.main:create_app --factory --reload --port 8010
 ```
 
 **Terminal 2 - frontend** (http://localhost:5173):
@@ -113,14 +113,14 @@ login token. **Log out** is in the header.
 
 Quick checks:
 
-- `GET http://localhost:8000/api/health` returns `{"status":"ok"}`.
-- `GET http://localhost:8000/api/me` returns `401` without a login token, and
+- `GET http://localhost:8010/api/health` returns `{"status":"ok"}`.
+- `GET http://localhost:8010/api/me` returns `401` without a login token, and
   `{"id": "...", "email": "..."}` with `Authorization: Bearer <access token>`.
-- `GET http://localhost:8000/api/health/db` returns `{"database":"ok"}` when
+- `GET http://localhost:8010/api/health/db` returns `{"database":"ok"}` when
   `DATABASE_URL` is correct, or `503 {"database":"unavailable"}` when it is not.
 
-If port 8000 is already in use, start the backend with another port (for example
-`--port 8001`) and set `VITE_API_BASE_URL=http://localhost:8001` in `frontend/.env`.
+If port 8010 is already in use, start the backend with another port and set
+`VITE_API_BASE_URL` to that URL in `frontend/.env`.
 
 ## Review and ingestion authorization (S1-013)
 
@@ -246,9 +246,9 @@ The committed `.env.example` files list every required name. Never commit secret
 | `CORS_ORIGINS` | Yes | Comma-separated frontend origins allowed to call the API, e.g. `http://localhost:5173` |
 | `SUPABASE_URL` | Yes | Supabase project URL, e.g. `https://<project-ref>.supabase.co`. Used to fetch the public keys that verify login tokens |
 | `SUPABASE_PUBLISHABLE_KEY` | Yes | Supabase publishable (or anon) key, the same public value as `VITE_SUPABASE_ANON_KEY`. Used to confirm with Supabase Auth that a login session is still active, so a token stops working as soon as its user logs out. The backend refuses an `sb_secret_` key here |
-| `OPENAI_API_KEY` | No | **Secret.** Enables review-grounded Q&A through OpenAI's Responses API. Without it, nonempty Q&A returns a safe 503. Set it only in `backend/.env`; review content is sent to OpenAI when a question is asked. With `LLM_BASE_URL` set, this holds that provider's key instead |
-| `LLM_BASE_URL` | No | HTTPS base URL of another Responses-API-compatible provider, e.g. `https://api.x.ai/v1` for xAI Grok. Unset means OpenAI |
-| `LLM_MODEL` | No | Model name for the provider, e.g. `grok-4.7`. Unset means `gpt-5.6-terra` |
+| `OPENAI_API_KEY` | No | **Secret.** Enables review-grounded Q&A through OpenAI or a compatible provider. Without it, nonempty Q&A returns a safe 503. Set it only in `backend/.env`; review content is sent to the configured provider when a question is asked |
+| `LLM_BASE_URL` | No | HTTPS base URL for a Responses-API-compatible provider, e.g. `https://api.x.ai/v1` or `https://api.groq.com/openai/v1`. Unset uses OpenAI |
+| `LLM_MODEL` | No | Provider model name, e.g. `grok-4.7` or `openai/gpt-oss-120b`. Unset uses `gpt-5.6-terra` |
 | `APIFY_API_TOKEN` | No | Server-side secret enabling direct Google Maps collection through the Compass actor |
 | `REVIEW_MAX_PER_RUN` | No | Google Maps record limit per collection, defaults to 100, maximum 1,000 |
 | `REVIEW_MAX_CHARGE_USD` | No | Maximum Apify charge per attempt, defaults to USD 0.10, maximum USD 5 |
@@ -260,7 +260,7 @@ The backend refuses to start and names the missing variables if a required value
 
 | Name | Required | Description |
 | --- | --- | --- |
-| `VITE_API_BASE_URL` | Yes | Backend base URL, e.g. `http://localhost:8000` |
+| `VITE_API_BASE_URL` | Yes | Backend base URL, e.g. `http://localhost:8010` |
 | `VITE_SUPABASE_URL` | Yes | Supabase project URL |
 | `VITE_SUPABASE_ANON_KEY` | Yes | Supabase anon or publishable (public) key. The app refuses to start if a service-role or `sb_secret_` key is put here |
 

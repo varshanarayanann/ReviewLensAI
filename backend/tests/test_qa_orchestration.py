@@ -241,10 +241,16 @@ def test_app_without_a_configured_provider_refuses_to_answer(settings, token_ver
 
 def test_app_uses_openai_provider_when_a_key_is_configured(settings, token_verifier):
     settings.openai_api_key = SecretStr("sk-test-key")
+    settings.llm_base_url = "https://api.groq.com/openai/v1"
+    settings.llm_model = "openai/gpt-oss-120b"
 
     app = create_app(settings, token_verifier=token_verifier)
 
     assert isinstance(app.state.llm_client, OpenAIReviewLLM)
+    assert str(app.state.llm_client._client.base_url).rstrip("/") == (
+        "https://api.groq.com/openai/v1"
+    )
+    assert app.state.llm_client._model == "openai/gpt-oss-120b"
 
 
 def test_injected_llm_client_takes_precedence_over_provider_configuration(

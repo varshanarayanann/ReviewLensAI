@@ -66,6 +66,13 @@ export function getQuestionHistory(base: string, targetId: string, token: string
   )
 }
 
+export async function clearQuestionHistory(base: string, targetId: string, token: string, signal: AbortSignal): Promise<void> {
+  const response = await fetch(`${base}/api/targets/${encodeURIComponent(targetId)}/questions`, {
+    method: 'DELETE', headers: { Authorization: `Bearer ${token}` }, signal,
+  })
+  if (!response.ok) throw new ApiError(response.status)
+}
+
 export function askReviewQuestion(base: string, targetId: string, token: string, question: string, signal: AbortSignal) {
   return targetRequest<ReviewAnswerResponse>(
     base, `/${encodeURIComponent(targetId)}/questions`, token, { question }, signal,

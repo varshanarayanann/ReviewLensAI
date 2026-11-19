@@ -60,7 +60,7 @@ export function DeleteTargetAction({ apiBaseUrl, targetId, targetName, token, di
       {disabled && <p className="muted">{MESSAGES.targetDeleteBusy}</p>}
     </details>
     <ConfirmDialog open={open} title={`Delete “${targetName}”?`}
-      description="This permanently removes the target, all its reviews, and its ingestion history. This can't be undone."
+      description="This permanently removes the target, all its reviews, ingestion history, and saved Q&A history. This can't be undone."
       confirmLabel="Delete target" pending={pending} onConfirm={() => void confirm()}
       onCancel={() => { setOpen(false); trigger.current?.focus() }}>
       {error && <Alert variant="danger">{error}</Alert>}

@@ -179,6 +179,15 @@ loading, empty, error, and retry states. It remains available without current
 review data. Successful new questions refresh saved history; target/account
 changes clear it and cancel stale requests. Render all stored content as text.
 
+**S3-008:** **Clear Q&A history** is a secondary action beneath saved history,
+separate from **Target actions → Delete target**. Its named confirmation explains
+that the target, source, reviews, and ingestion summary are preserved. Cancel
+receives initial focus; pending confirmation says Clearing and prevents duplicate
+actions. Clear is disabled during a local question, and asking is disabled during
+clearing. Success resets the current Q&A display/draft and reloads history; failure
+retains the existing history with a safe retry message inside the dialog. Dialog
+labels use unique IDs because both destructive actions can exist in one workspace.
+
 **S2-020:** Offer the question form when the persisted review summary confirms
 that the active target has reviews. With zero reviews, show guidance to use
 **Ingest reviews**. After a failed ingestion, use the persisted count to determine whether

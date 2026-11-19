@@ -2,6 +2,13 @@
 
 ## Google Maps ingestion update
 
+S3-008 adds confirmed **Clear Q&A history** and protected
+`DELETE /api/targets/{target_id}/questions`. Only target-owned exchanges are deleted
+transactionally; target/source/reviews/ingestion records and summaries remain.
+The UI resets current Q&A only after success and prevents local clear/ask overlap.
+New answers committed later by other clients can create new history. Shared
+ConfirmDialog uses unique IDs and supports action-specific pending labels.
+
 S3-007 restores owner-scoped Q&A history in the workspace, oldest first, in
 50-record pages. Target/auth changes unmount the history and abort pending reads;
 newly saved answers refresh it. Empty/failed datasets still allow history reads.

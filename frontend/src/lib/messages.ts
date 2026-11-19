@@ -1,4 +1,7 @@
 export const MESSAGES = {
+  questionHistoryClearFailed: 'Q&A history could not be cleared. Try again.',
+  questionHistoryCleared: 'Q&A history cleared. Your analysis target, source, reviews, and ingestion summary are unchanged.',
+  questionHistoryClearBusy: 'Wait for the current question to finish before clearing Q&A history.',
   questionHistoryEmpty: 'No saved questions for this analysis yet.',
   questionHistoryUnavailable: 'Saved Q&A history could not be loaded. Try again.',
   questionHistoryNoReviews: 'No reviews were available when this question was asked.',

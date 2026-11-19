@@ -469,3 +469,30 @@ never calls the model, and saved exchanges never become AI prompt context.
 
 No new migration is needed beyond S3-006's `0005_create_question_exchanges.sql`,
 which must be installed before this combined backend/frontend is deployed.
+
+### Clear Q&A history (S3-008)
+
+Use **Clear Q&A history** below the history section. The confirmation names the
+active target, initially focuses Cancel, and explains that only saved questions
+and responses will be removed. This differs from **Target actions → Delete target**,
+which deletes the analysis and its associated records. Confirming history clearing
+resets the current question/response display and draft, reloads saved history from
+its first page, and shows a success message. The workspace, source link, persisted
+reviews, latest ingestion state, and review summary remain intact.
+
+`DELETE /api/targets/{target_id}/questions` verifies the authenticated owner, locks
+the parent target, deletes all of that target's exchanges (not just the displayed
+page), and commits once before returning an empty 204. Clearing an already empty
+history is also 204. Another user's and nonexistent targets share 404. Database
+failures roll back and return a safe 503; the UI retains its existing history and
+offers retry in the confirmation dialog. No other tables are written or deleted.
+
+While clearing, the dialog prevents duplicate confirmation and cancellation, and
+new questions and workspace refresh are disabled. While a question is processing in this
+workspace, clearing is disabled with an explanation. Changing target/account
+unmounts the action, aborts its browser request, and ignores stale completion;
+aborting the browser request does not guarantee cancellation of the server write.
+Clearing removes exchanges visible to its database transaction. It does not cancel
+model work in other tabs/clients: a later committed answer is a new history entry.
+The saved reviews remain available for subsequent questions. No additional
+migration or provider call is needed beyond the existing S3-006 schema.

@@ -1,8 +1,8 @@
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from sqlalchemy import delete, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -33,7 +33,7 @@ def history_unavailable(db: Session, target_id: UUID, exc: SQLAlchemyError) -> N
         "Q&A history for target %s failed (%s)", target_id, type(exc).__name__
     )
     raise HTTPException(
-        503, "Analysis history could not be accessed or saved. Try again shortly."
+        503, "Analysis history could not be accessed or changed. Try again shortly."
     ) from None
 
 
@@ -60,6 +60,32 @@ def list_questions(
         ).all()
     except SQLAlchemyError as exc:
         history_unavailable(db, target_id, exc)
+
+
+@router.delete("/{target_id}/questions", status_code=204)
+def clear_questions(
+    target_id: UUID,
+    user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Response:
+    try:
+        target = db.scalar(
+            select(AnalysisTarget)
+            .where(
+                AnalysisTarget.id == target_id,
+                AnalysisTarget.owner_id == UUID(user.id),
+            )
+            .with_for_update()
+        )
+        if target is None:
+            raise HTTPException(404, "Analysis target not found.")
+        db.execute(
+            delete(QuestionExchange).where(QuestionExchange.target_id == target.id)
+        )
+        db.commit()
+    except SQLAlchemyError as exc:
+        history_unavailable(db, target_id, exc)
+    return Response(status_code=204)
 
 
 @router.post("/{target_id}/questions", response_model=QuestionAnswer)

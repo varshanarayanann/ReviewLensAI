@@ -6,6 +6,7 @@ import { ReviewQuestionPanel } from '../components/workspace/ReviewQuestionPanel
 import { AnalysisTargetWorkspaceView, type AnalysisTargetWorkspaceState, type ReviewSummaryState } from '../components/workspace/AnalysisTargetWorkspaceView'
 import { WorkspaceTargetSwitcher } from '../components/workspace/WorkspaceTargetSwitcher'
 import { DeleteTargetAction } from '../components/workspace/DeleteTargetAction'
+import { SavedReviewDataset } from '../components/workspace/SavedReviewDataset'
 import { ApiError, collectGoogleMapsReviews, getReviewSummary, getWorkspace, type IngestionResultResponse } from '../lib/api/client'
 import { useAuth } from '../lib/auth/AuthContext'
 import { MESSAGES } from '../lib/messages'
@@ -21,6 +22,7 @@ function Workspace({ apiBaseUrl, targetId, token }: { apiBaseUrl: string; target
   const mounted = useRef(false)
   const ingesting = useRef(false)
   const summaryRequestId = useRef(0)
+  const handleAccessDenied = useCallback(() => setState({ kind: 'missing' }), [])
 
   const refreshSummary = useCallback(async () => {
     const requestId = ++summaryRequestId.current
@@ -136,6 +138,10 @@ function Workspace({ apiBaseUrl, targetId, token }: { apiBaseUrl: string; target
               : result.state === 'processing' ? 'info' : 'success'
         }>{result.message}</Alert>}
       </section>
+      {state.kind === 'ready' && summary.kind === 'ready' && <SavedReviewDataset
+        key={`${attempt}:${result?.run_id ?? 'none'}:${summary.summary.review_count}`}
+        apiBaseUrl={apiBaseUrl} targetId={targetId} token={token}
+        total={summary.summary.review_count} onAccessDenied={handleAccessDenied} />}
       {state.kind === 'ready' && <DeleteTargetAction apiBaseUrl={apiBaseUrl} targetId={targetId}
         targetName={state.target.name} token={token} disabled={collecting}
         onAccessDenied={() => setState({ kind: 'missing' })} />}

@@ -188,6 +188,15 @@ for backend use and tests. See
 1. **Ingestion panel**: latest ingestion state, the primary `Ingest reviews` action (from the source URL), and the result message of the latest attempt.
 2. **Reviews panel**: persisted reviews for this target (`Reviews (N)` header + list), or an empty state if none.
 
+**S3-004:** The current inline workspace provides **View saved reviews** under
+`Reviews (N)`. Opening it loads 20 persisted reviews per page, with Previous/Next
+controls and safe loading/retry states. Hiding/reopening reloads the page from
+the backend. Ratings include numeric text; rating-only records say no written
+review is present. Original review text is rendered as text, clamped to four
+lines with Show more/Show less for long content. Reopening a saved target reloads
+its context, latest ingestion result, and summary; it never starts ingestion.
+Q&A history restoration is a separate story (S3-007).
+
 The analysis workspace's **Switch target** action (S2-017) lists the user's
 other analysis targets by name and source. Selecting a target opens its
 workspace route, which drives the target header, ingestion summary, and Q&A

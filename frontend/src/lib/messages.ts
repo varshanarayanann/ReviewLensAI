@@ -1,4 +1,7 @@
 export const MESSAGES = {
+  savedReviewsUnavailable: 'Saved reviews could not be loaded. Try again.',
+  savedReviewsEmpty: 'No saved reviews are available. Ingest reviews to build this analysis.',
+  ratingOnlyReview: 'Rating only — no written review.',
   targetDeleteFailed: 'The analysis target could not be deleted. Try again.',
   targetDeleteBusy: 'Reviews are being collected. Wait for ingestion to finish, then try deleting the target again.',
   questionRequired: 'Enter a question about the reviews.',

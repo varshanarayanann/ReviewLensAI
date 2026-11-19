@@ -1,7 +1,8 @@
+from datetime import UTC, datetime
 from enum import Enum
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class QuestionRequest(BaseModel):
@@ -26,3 +27,17 @@ class QuestionAnswer(BaseModel):
     status: AnswerStatus
     answer: str | None
     review_count: int = Field(ge=0)
+
+
+class QuestionExchangeRead(QuestionAnswer):
+    model_config = ConfigDict(extra="forbid", frozen=True, from_attributes=True)
+
+    id: UUID
+    question: str
+    created_at: datetime
+
+    @field_validator("created_at")
+    @classmethod
+    def utc_timestamp(cls, value: datetime) -> datetime:
+        # SQLite drops timezone information; stored timestamps are always UTC.
+        return value.replace(tzinfo=UTC) if value.tzinfo is None else value

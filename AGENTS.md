@@ -2,6 +2,12 @@
 
 ## Google Maps ingestion update
 
+S3-006 adds saved Q&A in `question_exchanges` (migration 0005, apply before backend
+deployment). Completed question requests persist question/answer/status/count and
+UTC timestamp under the authorized target. `GET /api/targets/{target_id}/questions`
+provides owner-scoped paginated history; target deletion removes it atomically.
+This saved display history is never included in AI context. S3-007 owns UI restore.
+
 Target workspaces also expose **Target actions → Delete target** with a native
 confirmation dialog. `DELETE /api/targets/{target_id}` checks verified ownership
 and atomically removes reviews, ingestion runs, and the target. Recent processing

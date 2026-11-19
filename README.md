@@ -340,15 +340,18 @@ existing draft PR using [the handoff instructions](docs/handoffs/s1-018-workspac
 
 Open **Target actions → Delete target** in the workspace. The confirmation names
 the target and initially focuses Cancel. Confirming permanently deletes the target,
-its reviews, and its ingestion history, then returns to the dashboard.
+its reviews, ingestion history, and saved Q&A history, then returns to the dashboard.
 
 `DELETE /api/targets/{target_id}` requires verified authentication and checks the
 owner before changing records. Missing and other users' targets both return 404.
-Deletion commits all three tables together and returns an empty 204 response;
+Deletion commits the target and its associated records together and returns 204;
 database failures roll back and return a safe 503. A processing run started within
 the last three minutes blocks deletion with 409, covering the provider's bounded
 collection timeout. Older abandoned processing runs can be removed with the
-target. No schema migration is required.
+target.
+
+Saved Q&A requires migration `0005_create_question_exchanges.sql` below; target
+deletion removes those exchanges in the same transaction once it is installed.
 
 ## Review Q&A and its test harness (S2-003)
 
@@ -381,3 +384,37 @@ truncation occurs. Context is rebuilt on every request and contains no prior
 target's history. Insufficient evidence is reported explicitly instead of
 inferred from general knowledge. See [the research and architecture decision](docs/qa-context-design.md)
 for limits, provider requirements and deterministic acceptance coverage.
+
+### Saved questions and responses (S3-006)
+
+Apply `backend/migrations/0005_create_question_exchanges.sql` in migration order
+**before deploying this backend**. It adds `question_exchanges` and enables RLS
+without public policies; application access remains through FastAPI only. This
+migration is not applied automatically to an existing/shared database.
+
+The existing `POST /api/targets/{target_id}/questions` automatically saves each
+completed exchange before returning its unchanged response contract. Stored fields
+are a stable UUID, target ID, trimmed question, answer, outcome, review count at
+answer time, and UTC creation timestamp. `answered`, `insufficient_evidence`, and
+`out_of_scope` preserve the actual returned text. A direct API request against an
+empty target saves `no_reviews` with a null answer and zero count, allowing the UI
+to reconstruct its empty-data state without claiming an AI answer was generated.
+Unauthorized/invalid requests, oversized context, and provider failures create no
+exchange. A storage failure rolls back the pair and returns safe 503 rather than
+reporting it as saved. Retrying a completed POST creates a separate exchange;
+request idempotency is not implemented.
+
+`GET /api/targets/{target_id}/questions?limit=50&offset=0` returns a JSON array of
+saved exchanges, oldest creation timestamp first, then UUID for stable ties.
+`limit` accepts 1–100 and `offset` is nonnegative. The response includes all stored
+fields above; an owned target with no history returns `[]`. Both endpoints derive
+ownership from verified authentication; inaccessible and nonexistent targets share
+404. Creation time records completion/persistence, not the start of a model call.
+
+Answers are stored as historical results, not recomputed when reviews change.
+No review text snapshots or supporting-evidence citations are stored: the current
+model contract supplies no citations, and `review_count` is only an answer-time
+count, not a reproducible dataset snapshot. Saved history is not supplied to the
+model or mixed into another target's context. Deleting a target deletes its
+history atomically. S3-007 covers restoring history in the workspace UI; this story
+provides persistence and the retrieval API, without changing the one-response UI.

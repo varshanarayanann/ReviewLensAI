@@ -2,6 +2,12 @@
 
 ## Google Maps ingestion update
 
+S3-004 reopens saved workspaces through their existing target route/dashboard and
+adds **View saved reviews** with 20-record pagination, rating-only display, safe
+retry, and request cancellation on target/account changes. Details, latest run,
+and summary reload from persisted APIs; reopening never initiates ingestion.
+Q&A history UI restoration remains separate (S3-007).
+
 S3-006 adds saved Q&A in `question_exchanges` (migration 0005, apply before backend
 deployment). Completed question requests persist question/answer/status/count and
 UTC timestamp under the authorized target. `GET /api/targets/{target_id}/questions`

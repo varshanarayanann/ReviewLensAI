@@ -7,6 +7,7 @@ import { AnalysisTargetWorkspaceView, type AnalysisTargetWorkspaceState, type Re
 import { WorkspaceTargetSwitcher } from '../components/workspace/WorkspaceTargetSwitcher'
 import { DeleteTargetAction } from '../components/workspace/DeleteTargetAction'
 import { SavedReviewDataset } from '../components/workspace/SavedReviewDataset'
+import { QuestionHistory } from '../components/workspace/QuestionHistory'
 import { ApiError, collectGoogleMapsReviews, getReviewSummary, getWorkspace, type IngestionResultResponse } from '../lib/api/client'
 import { useAuth } from '../lib/auth/AuthContext'
 import { MESSAGES } from '../lib/messages'
@@ -23,6 +24,8 @@ function Workspace({ apiBaseUrl, targetId, token }: { apiBaseUrl: string; target
   const ingesting = useRef(false)
   const summaryRequestId = useRef(0)
   const handleAccessDenied = useCallback(() => setState({ kind: 'missing' }), [])
+  const [historyVersion, setHistoryVersion] = useState(0)
+  const refreshHistory = useCallback(() => setHistoryVersion((value) => value + 1), [])
 
   const refreshSummary = useCallback(async () => {
     const requestId = ++summaryRequestId.current
@@ -117,13 +120,16 @@ function Workspace({ apiBaseUrl, targetId, token }: { apiBaseUrl: string; target
         <h2 id="review-questions-title">Ask about reviews</h2>
         {summary.kind === 'ready' && summary.summary.review_count > 0
           ? <ReviewQuestionPanel apiBaseUrl={apiBaseUrl} targetId={targetId}
-            targetName={state.target.name} token={token} onAccessDenied={() => setState({ kind: 'missing' })} />
+            targetName={state.target.name} token={token} onAccessDenied={handleAccessDenied} onAnswerSaved={refreshHistory} />
           : <p aria-live="polite" className="muted">{
             summary.kind === 'ready' ? MESSAGES.questionNoReviews
               : summary.kind === 'loading' ? MESSAGES.questionCheckingReviews
                 : MESSAGES.questionReviewCheckFailed
           }</p>}
       </section>}
+      {state.kind === 'ready' && <QuestionHistory key={`${attempt}:${historyVersion}`}
+        apiBaseUrl={apiBaseUrl} targetId={targetId} targetName={state.target.name}
+        token={token} onAccessDenied={handleAccessDenied} />}
       <section className="workspace-ingestion" aria-live="polite">
         <h2>Ingest reviews</h2>
         <p className="muted">{MESSAGES.ingestionSource}</p>

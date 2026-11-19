@@ -1,4 +1,7 @@
 export const MESSAGES = {
+  questionHistoryEmpty: 'No saved questions for this analysis yet.',
+  questionHistoryUnavailable: 'Saved Q&A history could not be loaded. Try again.',
+  questionHistoryNoReviews: 'No reviews were available when this question was asked.',
   savedReviewsUnavailable: 'Saved reviews could not be loaded. Try again.',
   savedReviewsEmpty: 'No saved reviews are available. Ingest reviews to build this analysis.',
   ratingOnlyReview: 'Rating only — no written review.',

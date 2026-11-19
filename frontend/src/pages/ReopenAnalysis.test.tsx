@@ -1,3 +1,4 @@
+import { stubFetchWithEmptyHistory } from '../test/emptyHistory'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { Link, MemoryRouter } from 'react-router'
 import { beforeEach, expect, it, vi } from 'vitest'
@@ -22,7 +23,7 @@ function defaultFetch(url: string) {
 
 beforeEach(() => {
   fetchMock = vi.fn(defaultFetch)
-  vi.stubGlobal('fetch', fetchMock)
+  stubFetchWithEmptyHistory(fetchMock)
 })
 
 function show(path = '/targets/target-a', fake = createFakeAuth(fakeSession())) {

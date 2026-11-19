@@ -172,6 +172,13 @@ panel under the target details alongside the existing summary and ingestion
 controls. It submits one question to `POST /api/targets/{id}/questions`, shows
 progress and the current response, and keeps the question available for retry.
 
+**S3-007:** A separate **Q&A history** section restores saved exchanges on opening
+the workspace. Display question, answer/outcome, and local creation time in the
+backend's oldest-first order, with 50-record Previous/Next pagination and explicit
+loading, empty, error, and retry states. It remains available without current
+review data. Successful new questions refresh saved history; target/account
+changes clear it and cancel stale requests. Render all stored content as text.
+
 **S2-020:** Offer the question form when the persisted review summary confirms
 that the active target has reviews. With zero reviews, show guidance to use
 **Ingest reviews**. After a failed ingestion, use the persisted count to determine whether

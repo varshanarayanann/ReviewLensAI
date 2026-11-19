@@ -54,6 +54,18 @@ export interface ReviewAnswerResponse {
   review_count: number
 }
 
+export interface QuestionExchangeResponse extends ReviewAnswerResponse {
+  id: string
+  question: string
+  created_at: string
+}
+
+export function getQuestionHistory(base: string, targetId: string, token: string, offset: number, signal: AbortSignal) {
+  return targetRequest<QuestionExchangeResponse[]>(
+    base, `/${encodeURIComponent(targetId)}/questions?limit=50&offset=${offset}`, token, undefined, signal,
+  )
+}
+
 export function askReviewQuestion(base: string, targetId: string, token: string, question: string, signal: AbortSignal) {
   return targetRequest<ReviewAnswerResponse>(
     base, `/${encodeURIComponent(targetId)}/questions`, token, { question }, signal,

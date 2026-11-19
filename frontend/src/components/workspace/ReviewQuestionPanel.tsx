@@ -17,9 +17,10 @@ interface ReviewQuestionPanelProps {
   targetName: string
   token: string
   onAccessDenied: () => void
+  onAnswerSaved?: () => void
 }
 
-export function ReviewQuestionPanel({ apiBaseUrl, targetId, targetName, token, onAccessDenied }: ReviewQuestionPanelProps) {
+export function ReviewQuestionPanel({ apiBaseUrl, targetId, targetName, token, onAccessDenied, onAnswerSaved }: ReviewQuestionPanelProps) {
   const { expireSession } = useAuth()
   const [question, setQuestion] = useState('')
   const [fieldError, setFieldError] = useState('')
@@ -61,6 +62,7 @@ export function ReviewQuestionPanel({ apiBaseUrl, targetId, targetName, token, o
         return
       }
       setAnswer(response)
+      onAnswerSaved?.()
     } catch (failure) {
       if (controller.signal.aborted) return
       if (failure instanceof ApiError) {

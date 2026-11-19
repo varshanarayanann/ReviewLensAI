@@ -353,6 +353,29 @@ target.
 Saved Q&A requires migration `0005_create_question_exchanges.sql` below; target
 deletion removes those exchanges in the same transaction once it is installed.
 
+## Reopen a saved analysis (S3-004)
+
+Log in and select an existing analysis target from the dashboard, or open its
+saved `/targets/{target_id}` link. A logged-out deep link returns to that same
+workspace after login. The workspace reloads the current name, Google Maps source,
+latest persisted ingestion result, review count, and average rating from the
+protected backend APIs; reopening does not initiate ingestion or recreate a target.
+
+Use **View saved reviews** in **Reviews (N)** to load the persisted dataset in
+20-review pages. Numeric ratings, original text, and rating-only entries are
+displayed; long text can be expanded. Reviews load on demand, without fetching
+the whole dataset into the browser. Closing/reopening the viewer reloads from
+the backend. Failed review requests have safe retry actions. Switching targets or
+accounts unmounts the viewer and aborts pending requests to avoid showing old data.
+
+The latest ingestion can be failed while earlier persisted reviews and their
+summary remain available. An empty target displays explicit ingestion guidance.
+Missing, deleted, and another user's targets remain inaccessible through the
+backend ownership checks. Reopening does not use local browser review snapshots
+or call an external provider. Saved Q&A UI restoration is S3-007, separate from
+this workspace/dataset restoration. Tests cover a fresh HTTP client and verified
+session on SQLite/PostgreSQL, plus dashboard and login/deep-link navigation in UI.
+
 ## Review Q&A and its test harness (S2-003)
 
 `POST /api/targets/{target_id}/questions` accepts `{"question": "..."}` and answers
@@ -417,4 +440,32 @@ model contract supplies no citations, and `review_count` is only an answer-time
 count, not a reproducible dataset snapshot. Saved history is not supplied to the
 model or mixed into another target's context. Deleting a target deletes its
 history atomically. S3-007 covers restoring history in the workspace UI; this story
-provides persistence and the retrieval API, without changing the one-response UI.
+provides persistence and the retrieval API; S3-007 below adds history restoration.
+
+### Restore Q&A history (S3-007)
+
+Opening `/targets/{target_id}` loads **Q&A history** from the protected questions
+GET endpoint, including when the target currently has no reviews or the review
+summary is unavailable. Questions, saved answers, outcome labels, and creation
+timestamps are shown oldest first in the backend's `(created_at, id)` order.
+Timestamps display in the browser's local timezone; formatting never changes
+the underlying order. `no_reviews` entries show their original lack-of-data state.
+
+History uses 50-record pages with **Previous questions** / **Next questions**;
+long histories are not silently truncated. When exactly 50 records end a page,
+the next page can be empty and explicitly says no more questions are available.
+The current question/response remains separate; after a successful saved response,
+the history reloads from its first page. A failed question does not refresh or
+discard saved history. **Refresh workspace** reloads history as well.
+
+Switching targets or authentication context unmounts the history view, aborts
+pending reads, and loads only the newly selected target's history. Late responses
+from the previous target/account are ignored. A page containing another target's
+records is rejected rather than displayed. Server authentication/ownership checks
+remain authoritative. History failures provide safe retry actions without hiding
+the rest of the workspace; 401 expires the session and 403/404 use the same
+unavailable-target state as other protected reads. Reading or retrying history
+never calls the model, and saved exchanges never become AI prompt context.
+
+No new migration is needed beyond S3-006's `0005_create_question_exchanges.sql`,
+which must be installed before this combined backend/frontend is deployed.

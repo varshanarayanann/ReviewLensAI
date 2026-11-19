@@ -1,3 +1,4 @@
+import { stubFetchWithEmptyHistory } from '../test/emptyHistory'
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
@@ -26,7 +27,7 @@ beforeEach(() => {
     if (url.endsWith('/api/targets')) return Promise.resolve(json([]))
     return Promise.resolve(json(target))
   })
-  vi.stubGlobal('fetch', fetchMock)
+  stubFetchWithEmptyHistory(fetchMock)
 })
 
 afterEach(() => {

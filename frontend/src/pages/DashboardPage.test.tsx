@@ -1,3 +1,4 @@
+import { stubFetchWithEmptyHistory } from '../test/emptyHistory'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { beforeEach, expect, it, vi } from 'vitest'
@@ -11,11 +12,11 @@ const target = {
   source_url: 'https://google.com/maps/place/A', created_at: '2026-01-01T12:00:00Z',
 }
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status })
-let fetchMock: ReturnType<typeof vi.fn>
+let fetchMock: ReturnType<typeof vi.fn<(url: string, options?: RequestInit) => Promise<Response>>>
 
 beforeEach(() => {
   fetchMock = vi.fn().mockResolvedValue(json([target]))
-  vi.stubGlobal('fetch', fetchMock)
+  stubFetchWithEmptyHistory(fetchMock)
 })
 
 function showDashboard() {

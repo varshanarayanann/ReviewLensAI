@@ -1,3 +1,4 @@
+import { stubFetchWithEmptyHistory } from './test/emptyHistory'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { AuthApiError, AuthRetryableFetchError } from '@supabase/supabase-js'
 import { MemoryRouter } from 'react-router'
@@ -29,11 +30,11 @@ function fillIn(label: RegExp, value: string) {
   fireEvent.change(screen.getByLabelText(label), { target: { value } })
 }
 
-let fetchMock: ReturnType<typeof vi.fn>
+let fetchMock: ReturnType<typeof vi.fn<(url: string, options?: RequestInit) => Promise<Response>>>
 
 beforeEach(() => {
   fetchMock = vi.fn().mockResolvedValue(jsonResponse([]))
-  vi.stubGlobal('fetch', fetchMock)
+  stubFetchWithEmptyHistory(fetchMock)
 })
 
 describe('route protection', () => {

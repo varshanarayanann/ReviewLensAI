@@ -33,11 +33,37 @@ export interface ReviewSummaryResponse {
   average_rating: number | null
 }
 
+export interface PersistedReviewResponse {
+  id: string
+  target_id: string
+  run_id: string
+  review_text: string
+  rating: number
+}
+
+export function getSavedReviews(base: string, targetId: string, token: string, offset: number, signal: AbortSignal) {
+  return targetRequest<PersistedReviewResponse[]>(
+    base, `/${encodeURIComponent(targetId)}/reviews?limit=20&offset=${offset}`, token, undefined, signal,
+  )
+}
+
 export interface ReviewAnswerResponse {
   target_id: string
   status: 'answered' | 'insufficient_evidence' | 'out_of_scope' | 'no_reviews'
   answer: string | null
   review_count: number
+}
+
+export interface QuestionExchangeResponse extends ReviewAnswerResponse {
+  id: string
+  question: string
+  created_at: string
+}
+
+export function getQuestionHistory(base: string, targetId: string, token: string, offset: number, signal: AbortSignal) {
+  return targetRequest<QuestionExchangeResponse[]>(
+    base, `/${encodeURIComponent(targetId)}/questions?limit=50&offset=${offset}`, token, undefined, signal,
+  )
 }
 
 export function askReviewQuestion(base: string, targetId: string, token: string, question: string, signal: AbortSignal) {

@@ -2,9 +2,10 @@ from uuid import UUID, uuid4
 
 import pytest
 from pydantic import ValidationError
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import AnalysisTarget
+from app.models import AnalysisTarget, QuestionExchange
 from app.models.ingestion import Review
 from app.schemas.analysis_target import AnalysisTargetUpdate
 from tests.test_ingestion_submission import source_targets as source_targets
@@ -60,6 +61,61 @@ def test_owner_can_rename_without_changing_source_or_reviews(
             db.query(Review).filter(Review.target_id == UUID(target)).count() == 1
         )
     assert stored_rows(database)["reviews"] == rows_before["reviews"]
+
+
+def test_owner_can_rename_without_changing_qa_history(
+    client, database, source_targets
+):
+    """S3-002: rename updates the display name only; Q&A rows stay intact."""
+    owner, target = source_targets[0]
+    before = client.get(f"/api/targets/{target}", headers=owner).json()
+    assert (
+        client.post(
+            f"/api/targets/{target}/ingestions",
+            headers=owner,
+            json={"csv_text": "rating,review_text\n5,Great coffee"},
+        ).status_code
+        == 200
+    )
+    with Session(database) as db:
+        db.add(
+            QuestionExchange(
+                target_id=UUID(target),
+                question="How is the coffee?",
+                answer="Customers say it's great.",
+                status="answered",
+                review_count=1,
+            )
+        )
+        db.commit()
+    history_before = client.get(
+        f"/api/targets/{target}/questions", headers=owner
+    ).json()
+    assert len(history_before) == 1
+
+    response = client.patch(
+        f"/api/targets/{target}", headers=owner, json={"name": "Renamed Cafe"}
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["name"] == "Renamed Cafe"
+    assert body["source_url"] == before["source_url"]
+    assert (
+        client.get(f"/api/targets/{target}/questions", headers=owner).json()
+        == history_before
+    )
+
+    with Session(database) as db:
+        rows = db.scalars(
+            select(QuestionExchange).where(QuestionExchange.target_id == UUID(target))
+        ).all()
+        assert len(rows) == 1
+        assert rows[0].question == "How is the coffee?"
+        assert rows[0].answer == "Customers say it's great."
+        assert rows[0].status == "answered"
+        assert (
+            db.query(Review).filter(Review.target_id == UUID(target)).count() == 1
+        )
 
 
 def test_rename_rejects_source_url_and_owner_fields(client, source_targets):

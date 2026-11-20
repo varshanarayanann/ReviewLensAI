@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
-import { beforeEach, expect, it, vi } from 'vitest'
+import { beforeEach, expect, it } from 'vitest'
 import App from '../App'
 import { suggestAnalysisName } from '../lib/api/client'
 import { createFakeAuth, fakeSession } from '../test/fakeAuth'
@@ -15,9 +15,10 @@ const target = {
   created_at: '2026-01-01T12:00:00Z',
 }
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status })
+let fetchMock: ReturnType<typeof stubFetchWithEmptyHistory>
 
 beforeEach(() => {
-  stubFetchWithEmptyHistory(vi.fn((url: string, options?: RequestInit) => {
+  fetchMock = stubFetchWithEmptyHistory((url: string, options?: RequestInit) => {
     if (options?.method === 'PATCH') {
       return Promise.resolve(json({
         id: target.id,
@@ -39,7 +40,7 @@ beforeEach(() => {
       platform: 'google_maps',
       source_url: target.source_url,
     }))
-  }))
+  })
 })
 
 it('lists saved analysis names in the sidebar', async () => {
@@ -62,7 +63,7 @@ it('renames an analysis without changing the source URL', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Save name' }))
   expect(await screen.findByRole('heading', { name: 'Downtown Hapive' })).toBeInTheDocument()
   await waitFor(() => {
-    expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+    expect(fetchMock).toHaveBeenCalledWith(
       'http://api.test/api/targets/target-a',
       expect.objectContaining({
         method: 'PATCH',

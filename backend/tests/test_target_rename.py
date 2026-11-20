@@ -57,15 +57,11 @@ def test_owner_can_rename_without_changing_source_or_reviews(
         assert saved is not None
         assert saved.name == "Downtown Cafe"
         assert saved.source_url == before["source_url"]
-        assert (
-            db.query(Review).filter(Review.target_id == UUID(target)).count() == 1
-        )
+        assert db.query(Review).filter(Review.target_id == UUID(target)).count() == 1
     assert stored_rows(database)["reviews"] == rows_before["reviews"]
 
 
-def test_owner_can_rename_without_changing_qa_history(
-    client, database, source_targets
-):
+def test_owner_can_rename_without_changing_qa_history(client, database, source_targets):
     """S3-002: rename updates the display name only; Q&A rows stay intact."""
     owner, target = source_targets[0]
     before = client.get(f"/api/targets/{target}", headers=owner).json()
@@ -113,9 +109,7 @@ def test_owner_can_rename_without_changing_qa_history(
         assert rows[0].question == "How is the coffee?"
         assert rows[0].answer == "Customers say it's great."
         assert rows[0].status == "answered"
-        assert (
-            db.query(Review).filter(Review.target_id == UUID(target)).count() == 1
-        )
+        assert db.query(Review).filter(Review.target_id == UUID(target)).count() == 1
 
 
 def test_rename_rejects_source_url_and_owner_fields(client, source_targets):

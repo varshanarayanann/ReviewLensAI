@@ -40,8 +40,7 @@ def seed_qa(database, target_id: str, question: str):
 def history_target_ids(database):
     with Session(database) as db:
         return {
-            str(row)
-            for row in db.scalars(select(QuestionExchange.target_id)).all()
+            str(row) for row in db.scalars(select(QuestionExchange.target_id)).all()
         }
 
 

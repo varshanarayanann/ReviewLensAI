@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
-import { ApiError, deleteTarget } from '../../lib/api/client'
+import { ApiError, deleteTarget, notifyTargetsChanged } from '../../lib/api/client'
 import { useAuth } from '../../lib/auth/AuthContext'
 import { MESSAGES } from '../../lib/messages'
 import { Alert } from '../ui/Alert'
@@ -34,7 +34,10 @@ export function DeleteTargetAction({ apiBaseUrl, targetId, targetName, token, di
     setError('')
     try {
       await deleteTarget(apiBaseUrl, targetId, token, controller.signal)
-      if (!controller.signal.aborted) void navigate('/dashboard', { replace: true })
+      if (!controller.signal.aborted) {
+        notifyTargetsChanged()
+        void navigate('/dashboard', { replace: true })
+      }
     } catch (failure) {
       if (controller.signal.aborted) return
       if (failure instanceof ApiError && failure.status === 401) {

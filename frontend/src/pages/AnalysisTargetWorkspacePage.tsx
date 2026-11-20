@@ -9,6 +9,7 @@ import { DeleteTargetAction } from '../components/workspace/DeleteTargetAction'
 import { SavedReviewDataset } from '../components/workspace/SavedReviewDataset'
 import { QuestionHistory } from '../components/workspace/QuestionHistory'
 import { ClearQuestionHistoryAction } from '../components/workspace/ClearQuestionHistoryAction'
+import { RenameAnalysisAction } from '../components/workspace/RenameAnalysisAction'
 import { ApiError, collectGoogleMapsReviews, getReviewSummary, getWorkspace, type IngestionResultResponse } from '../lib/api/client'
 import { useAuth } from '../lib/auth/AuthContext'
 import { MESSAGES } from '../lib/messages'
@@ -160,9 +161,15 @@ function Workspace({ apiBaseUrl, targetId, token }: { apiBaseUrl: string; target
         key={`${attempt}:${result?.run_id ?? 'none'}:${summary.summary.review_count}`}
         apiBaseUrl={apiBaseUrl} targetId={targetId} token={token}
         total={summary.summary.review_count} onAccessDenied={handleAccessDenied} />}
-      {state.kind === 'ready' && <DeleteTargetAction apiBaseUrl={apiBaseUrl} targetId={targetId}
-        targetName={state.target.name} token={token} disabled={collecting}
-        onAccessDenied={() => setState({ kind: 'missing' })} />}
+      {state.kind === 'ready' && <div className="workspace-analysis-actions">
+        <RenameAnalysisAction apiBaseUrl={apiBaseUrl} targetId={targetId}
+          targetName={state.target.name} token={token} disabled={collecting || clearingHistory}
+          onRenamed={(name) => setState({ kind: 'ready', target: { ...state.target, name } })}
+          onAccessDenied={handleAccessDenied} />
+        <DeleteTargetAction apiBaseUrl={apiBaseUrl} targetId={targetId}
+          targetName={state.target.name} token={token} disabled={collecting || clearingHistory}
+          onAccessDenied={handleAccessDenied} />
+      </div>}
     </AnalysisTargetWorkspaceView>
     {state.kind !== 'loading' && state.kind !== 'missing' && state.kind !== 'forbidden' && <button
       className="button button--secondary workspace-refresh" disabled={collecting || clearingHistory} onClick={refresh}>Refresh workspace</button>}
@@ -172,7 +179,7 @@ function Workspace({ apiBaseUrl, targetId, token }: { apiBaseUrl: string; target
 export default function AnalysisTargetWorkspacePage({ apiBaseUrl }: { apiBaseUrl: string }) {
   const { targetId = '' } = useParams()
   const { session } = useAuth()
-  return <AppShell>{session && <Workspace
+  return <AppShell apiBaseUrl={apiBaseUrl}>{session && <Workspace
     key={`${apiBaseUrl}:${targetId}:${session.user.id}:${session.access_token}`}
     apiBaseUrl={apiBaseUrl} targetId={targetId} token={session.access_token} />}</AppShell>
 }

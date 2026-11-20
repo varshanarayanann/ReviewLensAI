@@ -19,7 +19,11 @@ from app.reviews.csv_source import ReviewSourceError, parse_csv_reviews
 from app.reviews.google_maps import ApifyReviewSource, ReviewCollectionError
 from app.reviews.normalization import normalize_reviews
 from app.schemas import target_list
-from app.schemas.analysis_target import AnalysisTargetCreate, AnalysisTargetRead
+from app.schemas.analysis_target import (
+    AnalysisTargetCreate,
+    AnalysisTargetRead,
+    AnalysisTargetUpdate,
+)
 from app.schemas.ingestion_result import IngestionResult
 from app.schemas.review import ReviewResponse
 from app.schemas.review_summary import ReviewSummary
@@ -52,6 +56,20 @@ def owned(target_id: UUID, user: CurrentUser, db: Session) -> AnalysisTarget:
     )
     if target is None:
         raise HTTPException(404, "Analysis target not found.")
+    return target
+
+
+@router.patch("/{target_id}", response_model=AnalysisTargetRead)
+def rename_target(
+    target_id: UUID,
+    body: AnalysisTargetUpdate,
+    user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    target = owned(target_id, user, db)
+    target.name = body.name
+    db.commit()
+    db.refresh(target)
     return target
 
 

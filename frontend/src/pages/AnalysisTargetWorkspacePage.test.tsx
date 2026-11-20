@@ -20,6 +20,7 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 let fetchMock: ReturnType<typeof vi.fn<(url: string, options?: RequestInit) => Promise<Response>>>
 
 function defaultResponse(url: string, summary = emptySummary) {
+  if (url === 'http://api.test/api/targets') return []
   if (url.endsWith('/latest')) return null
   if (url.endsWith('/reviews/summary')) return summary
   return target
@@ -226,12 +227,15 @@ it('loads the authorized target, real platform, source link, and no-run state', 
   expect(screen.getByRole('link', { name: target.source_url })).toHaveAttribute('rel', 'noopener noreferrer')
   expect(screen.getByText('Not ingested')).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Ingest reviews' })).toBeEnabled()
-  expect(fetchMock).toHaveBeenNthCalledWith(1, 'http://api.test/api/targets/target-a', expect.objectContaining({
+  expect(fetchMock).toHaveBeenCalledWith('http://api.test/api/targets/target-a', expect.objectContaining({
     headers: expect.objectContaining({ Authorization: 'Bearer test-access-token' }),
   }))
-  expect(fetchMock).toHaveBeenNthCalledWith(2, 'http://api.test/api/targets/target-a/ingestions/latest', expect.anything())
-  expect(fetchMock).toHaveBeenNthCalledWith(3, 'http://api.test/api/targets/target-a/reviews/summary', expect.objectContaining({
+  expect(fetchMock).toHaveBeenCalledWith('http://api.test/api/targets/target-a/ingestions/latest', expect.anything())
+  expect(fetchMock).toHaveBeenCalledWith('http://api.test/api/targets/target-a/reviews/summary', expect.objectContaining({
     headers: expect.objectContaining({ Authorization: expect.any(String) }),
+  }))
+  expect(fetchMock).toHaveBeenCalledWith('http://api.test/api/targets', expect.objectContaining({
+    headers: { Authorization: 'Bearer test-access-token' },
   }))
   expect(screen.getByText('0 reviews')).toBeInTheDocument()
   expect(screen.getByText('No ratings yet')).toBeInTheDocument()
@@ -295,19 +299,27 @@ it('shows a loading state without an ingestion action while data is pending', as
 })
 
 it.each([[403], [404]])('maps access response %s to the same safe unavailable state', async (status) => {
-  fetchMock.mockImplementation(() => Promise.resolve(json({ detail: 'private raw detail' }, status)))
+  fetchMock.mockImplementation((url: string) => Promise.resolve(
+    url === 'http://api.test/api/targets'
+      ? json([])
+      : json({ detail: 'private raw detail' }, status),
+  ))
   showWorkspace()
   expect(await screen.findByRole('alert')).toHaveTextContent(MESSAGES.targetNotFound)
   expect(screen.queryByText(target.name)).not.toBeInTheDocument()
   expect(screen.queryByText('private raw detail')).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Ingest reviews' })).not.toBeInTheDocument()
-  expect(fetchMock).toHaveBeenCalledTimes(1)
+  expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/targets/target-a'))).toBe(true)
 })
 
 it('shows safe load failure and refreshes successfully', async () => {
-  fetchMock.mockImplementationOnce(() => Promise.reject(new Error('sensitive network detail')))
+  fetchMock.mockImplementation((url: string) => {
+    if (url === 'http://api.test/api/targets') return Promise.resolve(json([]))
+    return Promise.reject(new Error('sensitive network detail'))
+  })
   showWorkspace()
   expect(await screen.findByRole('alert')).toHaveTextContent(MESSAGES.offline)
+  fetchMock.mockImplementation((url: string) => Promise.resolve(json(defaultResponse(url))))
   fireEvent.click(screen.getByRole('button', { name: 'Refresh workspace' }))
   expect(await screen.findByRole('heading', { name: target.name })).toBeInTheDocument()
   expect(screen.queryByText(/sensitive/)).not.toBeInTheDocument()

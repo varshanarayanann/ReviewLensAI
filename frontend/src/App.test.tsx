@@ -33,7 +33,7 @@ function fillIn(label: RegExp, value: string) {
 let fetchMock: ReturnType<typeof vi.fn<(url: string, options?: RequestInit) => Promise<Response>>>
 
 beforeEach(() => {
-  fetchMock = vi.fn().mockResolvedValue(jsonResponse([]))
+  fetchMock = vi.fn().mockImplementation(() => Promise.resolve(jsonResponse([])))
   stubFetchWithEmptyHistory(fetchMock)
 })
 
@@ -231,7 +231,7 @@ describe('session', () => {
   })
 
   it('signs out and explains why when the backend rejects the token', async () => {
-    fetchMock.mockResolvedValue(jsonResponse({ detail: 'Authentication required.' }, 401))
+    fetchMock.mockImplementation(() => Promise.resolve(jsonResponse({ detail: 'Authentication required.' }, 401)))
     const fake = renderApp('/dashboard', createFakeAuth(fakeSession()))
 
     expect(await screen.findByText(MESSAGES.sessionEnded)).toBeInTheDocument()
@@ -241,7 +241,7 @@ describe('session', () => {
   })
 
   it('shows a mapped error when the backend fails for another reason', async () => {
-    fetchMock.mockResolvedValue(jsonResponse({ detail: 'Authentication service is unavailable.' }, 503))
+    fetchMock.mockImplementation(() => Promise.resolve(jsonResponse({ detail: 'Authentication service is unavailable.' }, 503)))
     renderApp('/dashboard', createFakeAuth(fakeSession()))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(MESSAGES.unexpected)

@@ -118,6 +118,68 @@ export async function deleteTarget(base: string, targetId: string, token: string
   if (!response.ok) throw new ApiError(response.status)
 }
 
+export async function renameTarget(
+  base: string,
+  targetId: string,
+  token: string,
+  name: string,
+  signal?: AbortSignal,
+): Promise<WorkspaceTargetResponse> {
+  const response = await fetch(`${base}/api/targets/${encodeURIComponent(targetId)}`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    ...(signal ? { signal } : {}),
+    body: JSON.stringify({ name }),
+  })
+  if (!response.ok) throw new ApiError(response.status)
+  return (await response.json()) as WorkspaceTargetResponse
+}
+
+export async function copyTarget(
+  base: string,
+  targetId: string,
+  token: string,
+  name: string,
+  signal?: AbortSignal,
+): Promise<WorkspaceTargetResponse> {
+  const response = await fetch(
+    `${base}/api/targets/${encodeURIComponent(targetId)}/copies`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      ...(signal ? { signal } : {}),
+      body: JSON.stringify({ name }),
+    },
+  )
+  if (!response.ok) throw new ApiError(response.status)
+  return (await response.json()) as WorkspaceTargetResponse
+}
+
+/** Default Save As name: "{name} copy", truncated to 120 characters. */
+export function suggestCopyAnalysisName(name: string): string {
+  const trimmed = name.trim()
+  const suffix = ' copy'
+  if (trimmed.length + suffix.length <= 120) return `${trimmed}${suffix}`
+  return `${trimmed.slice(0, 120 - suffix.length)}${suffix}`
+}
+
+/** Notify the analysis sidebar that the saved-target list may have changed. */
+export function notifyTargetsChanged() {
+  window.dispatchEvent(new Event('reviewlens:targets-changed'))
+}
+
+/** Suggest a short analysis name from a Google Maps place URL path segment. */
+export function suggestAnalysisName(sourceUrl: string): string {
+  try {
+    const path = new URL(sourceUrl).pathname
+    const match = path.match(/\/place\/([^/]+)/)
+    if (!match) return ''
+    return decodeURIComponent(match[1].replace(/\+/g, ' ')).slice(0, 120)
+  } catch {
+    return ''
+  }
+}
+
 export class ApiError extends Error {
   readonly status: number
 

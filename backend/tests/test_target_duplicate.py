@@ -11,7 +11,9 @@ from tests.test_ingestion_submission import stored_rows
 from tests.test_target_workflow import database as database
 
 
-def seed_reviews(client, headers, target, csv_text="rating,review_text\n5,Great coffee"):
+def seed_reviews(
+    client, headers, target, csv_text="rating,review_text\n5,Great coffee"
+):
     response = client.post(
         f"/api/targets/{target}/ingestions",
         headers=headers,
@@ -42,7 +44,8 @@ def test_copy_rejects_unusable_names(name):
 
 
 def test_copy_trims_name():
-    assert AnalysisTargetCopy(name="  Hapive Coffee copy  ").name == "Hapive Coffee copy"
+    copied = AnalysisTargetCopy(name="  Hapive Coffee copy  ")
+    assert copied.name == "Hapive Coffee copy"
 
 
 def test_copy_requires_authentication(client):
@@ -58,7 +61,9 @@ def test_save_as_creates_independent_copy_with_reviews_and_qa(
     source = client.get(f"/api/targets/{target}", headers=owner).json()
     seed_reviews(client, owner, target)
     seed_qa(database, target)
-    source_history = client.get(f"/api/targets/{target}/questions", headers=owner).json()
+    source_history = client.get(
+        f"/api/targets/{target}/questions", headers=owner
+    ).json()
     source_reviews = client.get(f"/api/targets/{target}/reviews", headers=owner).json()
     before = stored_rows(database)
 
@@ -152,7 +157,8 @@ def test_deleting_copy_does_not_delete_original(client, database, source_targets
     assert client.delete(f"/api/targets/{copy_id}", headers=owner).status_code == 204
     assert client.get(f"/api/targets/{target}", headers=owner).status_code == 200
     assert len(client.get(f"/api/targets/{target}/reviews", headers=owner).json()) == 1
-    assert len(client.get(f"/api/targets/{target}/questions", headers=owner).json()) == 1
+    questions = client.get(f"/api/targets/{target}/questions", headers=owner).json()
+    assert len(questions) == 1
     with Session(database) as db:
         assert db.get(AnalysisTarget, UUID(copy_id)) is None
         assert db.get(AnalysisTarget, UUID(target)) is not None

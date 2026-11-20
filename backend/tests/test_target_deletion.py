@@ -94,7 +94,8 @@ def test_delete_clears_qa_history_for_target_and_leaves_others(
     response = client.delete(f"/api/targets/{target}", headers=owner)
     assert response.status_code == 204
     assert history_target_ids(database) == {other_target}
-    assert client.get(f"/api/targets/{target}/questions", headers=owner).status_code == 404
+    questions = client.get(f"/api/targets/{target}/questions", headers=owner)
+    assert questions.status_code == 404
     remaining = client.get(
         f"/api/targets/{other_target}/questions", headers=other_owner
     ).json()

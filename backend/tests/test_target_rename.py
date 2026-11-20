@@ -149,4 +149,5 @@ def test_missing_and_other_users_targets_share_safe_denial(
     assert denied.status_code == missing.status_code == 404
     assert denied.json() == missing.json() == {"detail": "Analysis target not found."}
     assert stored_rows(database) == before
-    assert client.get(f"/api/targets/{target}", headers=owner).json()["name"] != "Stolen"
+    renamed = client.get(f"/api/targets/{target}", headers=owner).json()
+    assert renamed["name"] != "Stolen"

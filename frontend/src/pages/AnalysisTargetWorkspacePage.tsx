@@ -10,6 +10,7 @@ import { SavedReviewDataset } from '../components/workspace/SavedReviewDataset'
 import { QuestionHistory } from '../components/workspace/QuestionHistory'
 import { ClearQuestionHistoryAction } from '../components/workspace/ClearQuestionHistoryAction'
 import { RenameAnalysisAction } from '../components/workspace/RenameAnalysisAction'
+import { SaveAsAnalysisAction } from '../components/workspace/SaveAsAnalysisAction'
 import { ApiError, collectGoogleMapsReviews, getReviewSummary, getWorkspace, type IngestionResultResponse } from '../lib/api/client'
 import { useAuth } from '../lib/auth/AuthContext'
 import { MESSAGES } from '../lib/messages'
@@ -165,6 +166,9 @@ function Workspace({ apiBaseUrl, targetId, token }: { apiBaseUrl: string; target
         <RenameAnalysisAction apiBaseUrl={apiBaseUrl} targetId={targetId}
           targetName={state.target.name} token={token} disabled={collecting || clearingHistory}
           onRenamed={(name) => setState({ kind: 'ready', target: { ...state.target, name } })}
+          onAccessDenied={handleAccessDenied} />
+        <SaveAsAnalysisAction apiBaseUrl={apiBaseUrl} targetId={targetId}
+          targetName={state.target.name} token={token} disabled={collecting || clearingHistory}
           onAccessDenied={handleAccessDenied} />
         <DeleteTargetAction apiBaseUrl={apiBaseUrl} targetId={targetId}
           targetName={state.target.name} token={token} disabled={collecting || clearingHistory}

@@ -22,6 +22,14 @@ class AnalysisTargetUpdate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
 
 
+class AnalysisTargetCopy(BaseModel):
+    """Save As contract; only the new analysis display name is accepted."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    name: str = Field(min_length=1, max_length=120)
+
+
 class AnalysisTargetCreate(BaseModel):
     """Creation contract; ownership is supplied by verified auth, never the body."""
 

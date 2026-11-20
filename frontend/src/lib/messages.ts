@@ -11,6 +11,7 @@ export const MESSAGES = {
   targetDeleteFailed: 'The analysis target could not be deleted. Try again.',
   targetDeleteBusy: 'Reviews are being collected. Wait for ingestion to finish, then try deleting the target again.',
   targetRenameFailed: 'The analysis could not be renamed. Try again.',
+  targetCopyFailed: 'The analysis could not be saved as a new copy. Try again.',
   targetNameRequired: 'Enter a short name for this analysis (1–120 characters).',
   sidebarLoadFailed: 'Could not load saved analyses. Try again.',
   noSavedAnalyses: 'No saved analyses yet.',

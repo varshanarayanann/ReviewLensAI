@@ -1,3 +1,4 @@
+import { stubFetchWithEmptyHistory } from '../test/emptyHistory'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { expect, it, vi } from 'vitest'
@@ -36,7 +37,7 @@ it('asks the same question against the newly active target and shows its matchin
     }
     return Promise.resolve(json({}, 404))
   })
-  vi.stubGlobal('fetch', fetchMock)
+  stubFetchWithEmptyHistory(fetchMock)
 
   render(<MemoryRouter initialEntries={['/targets/phone']}>
     <App config={config} authClient={createFakeAuth(fakeSession()).client} />

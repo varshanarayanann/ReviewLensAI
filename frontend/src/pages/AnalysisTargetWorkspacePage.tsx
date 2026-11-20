@@ -6,6 +6,9 @@ import { ReviewQuestionPanel } from '../components/workspace/ReviewQuestionPanel
 import { AnalysisTargetWorkspaceView, type AnalysisTargetWorkspaceState, type ReviewSummaryState } from '../components/workspace/AnalysisTargetWorkspaceView'
 import { WorkspaceTargetSwitcher } from '../components/workspace/WorkspaceTargetSwitcher'
 import { DeleteTargetAction } from '../components/workspace/DeleteTargetAction'
+import { SavedReviewDataset } from '../components/workspace/SavedReviewDataset'
+import { QuestionHistory } from '../components/workspace/QuestionHistory'
+import { ClearQuestionHistoryAction } from '../components/workspace/ClearQuestionHistoryAction'
 import { ApiError, collectGoogleMapsReviews, getReviewSummary, getWorkspace, type IngestionResultResponse } from '../lib/api/client'
 import { useAuth } from '../lib/auth/AuthContext'
 import { MESSAGES } from '../lib/messages'
@@ -21,6 +24,16 @@ function Workspace({ apiBaseUrl, targetId, token }: { apiBaseUrl: string; target
   const mounted = useRef(false)
   const ingesting = useRef(false)
   const summaryRequestId = useRef(0)
+  const handleAccessDenied = useCallback(() => setState({ kind: 'missing' }), [])
+  const [historyVersion, setHistoryVersion] = useState(0)
+  const refreshHistory = useCallback(() => setHistoryVersion((value) => value + 1), [])
+  const [questionVersion, setQuestionVersion] = useState(0)
+  const [questionBusy, setQuestionBusy] = useState(false)
+  const [clearingHistory, setClearingHistory] = useState(false)
+  const historyCleared = useCallback(() => {
+    setQuestionVersion((value) => value + 1)
+    refreshHistory()
+  }, [refreshHistory])
 
   const refreshSummary = useCallback(async () => {
     const requestId = ++summaryRequestId.current
@@ -114,14 +127,21 @@ function Workspace({ apiBaseUrl, targetId, token }: { apiBaseUrl: string; target
       {state.kind === 'ready' && <section className="workspace-questions" aria-labelledby="review-questions-title">
         <h2 id="review-questions-title">Ask about reviews</h2>
         {summary.kind === 'ready' && summary.summary.review_count > 0
-          ? <ReviewQuestionPanel apiBaseUrl={apiBaseUrl} targetId={targetId}
-            targetName={state.target.name} token={token} onAccessDenied={() => setState({ kind: 'missing' })} />
+          ? <ReviewQuestionPanel key={questionVersion} apiBaseUrl={apiBaseUrl} targetId={targetId}
+            disabled={clearingHistory} onBusyChange={setQuestionBusy}
+            targetName={state.target.name} token={token} onAccessDenied={handleAccessDenied} onAnswerSaved={refreshHistory} />
           : <p aria-live="polite" className="muted">{
             summary.kind === 'ready' ? MESSAGES.questionNoReviews
               : summary.kind === 'loading' ? MESSAGES.questionCheckingReviews
                 : MESSAGES.questionReviewCheckFailed
           }</p>}
       </section>}
+      {state.kind === 'ready' && <QuestionHistory key={`${attempt}:${historyVersion}`}
+        apiBaseUrl={apiBaseUrl} targetId={targetId} targetName={state.target.name}
+        token={token} onAccessDenied={handleAccessDenied} />}
+      {state.kind === 'ready' && <ClearQuestionHistoryAction apiBaseUrl={apiBaseUrl}
+        targetId={targetId} targetName={state.target.name} token={token} disabled={questionBusy}
+        onAccessDenied={handleAccessDenied} onCleared={historyCleared} onPendingChange={setClearingHistory} />}
       <section className="workspace-ingestion" aria-live="polite">
         <h2>Ingest reviews</h2>
         <p className="muted">{MESSAGES.ingestionSource}</p>
@@ -136,12 +156,16 @@ function Workspace({ apiBaseUrl, targetId, token }: { apiBaseUrl: string; target
               : result.state === 'processing' ? 'info' : 'success'
         }>{result.message}</Alert>}
       </section>
+      {state.kind === 'ready' && summary.kind === 'ready' && <SavedReviewDataset
+        key={`${attempt}:${result?.run_id ?? 'none'}:${summary.summary.review_count}`}
+        apiBaseUrl={apiBaseUrl} targetId={targetId} token={token}
+        total={summary.summary.review_count} onAccessDenied={handleAccessDenied} />}
       {state.kind === 'ready' && <DeleteTargetAction apiBaseUrl={apiBaseUrl} targetId={targetId}
         targetName={state.target.name} token={token} disabled={collecting}
         onAccessDenied={() => setState({ kind: 'missing' })} />}
     </AnalysisTargetWorkspaceView>
     {state.kind !== 'loading' && state.kind !== 'missing' && state.kind !== 'forbidden' && <button
-      className="button button--secondary workspace-refresh" disabled={collecting} onClick={refresh}>Refresh workspace</button>}
+      className="button button--secondary workspace-refresh" disabled={collecting || clearingHistory} onClick={refresh}>Refresh workspace</button>}
   </>
 }
 

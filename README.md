@@ -340,15 +340,41 @@ existing draft PR using [the handoff instructions](docs/handoffs/s1-018-workspac
 
 Open **Target actions → Delete target** in the workspace. The confirmation names
 the target and initially focuses Cancel. Confirming permanently deletes the target,
-its reviews, and its ingestion history, then returns to the dashboard.
+its reviews, ingestion history, and saved Q&A history, then returns to the dashboard.
 
 `DELETE /api/targets/{target_id}` requires verified authentication and checks the
 owner before changing records. Missing and other users' targets both return 404.
-Deletion commits all three tables together and returns an empty 204 response;
+Deletion commits the target and its associated records together and returns 204;
 database failures roll back and return a safe 503. A processing run started within
 the last three minutes blocks deletion with 409, covering the provider's bounded
 collection timeout. Older abandoned processing runs can be removed with the
-target. No schema migration is required.
+target.
+
+Saved Q&A requires migration `0005_create_question_exchanges.sql` below; target
+deletion removes those exchanges in the same transaction once it is installed.
+
+## Reopen a saved analysis (S3-004)
+
+Log in and select an existing analysis target from the dashboard, or open its
+saved `/targets/{target_id}` link. A logged-out deep link returns to that same
+workspace after login. The workspace reloads the current name, Google Maps source,
+latest persisted ingestion result, review count, and average rating from the
+protected backend APIs; reopening does not initiate ingestion or recreate a target.
+
+Use **View saved reviews** in **Reviews (N)** to load the persisted dataset in
+20-review pages. Numeric ratings, original text, and rating-only entries are
+displayed; long text can be expanded. Reviews load on demand, without fetching
+the whole dataset into the browser. Closing/reopening the viewer reloads from
+the backend. Failed review requests have safe retry actions. Switching targets or
+accounts unmounts the viewer and aborts pending requests to avoid showing old data.
+
+The latest ingestion can be failed while earlier persisted reviews and their
+summary remain available. An empty target displays explicit ingestion guidance.
+Missing, deleted, and another user's targets remain inaccessible through the
+backend ownership checks. Reopening does not use local browser review snapshots
+or call an external provider. Saved Q&A UI restoration is S3-007, separate from
+this workspace/dataset restoration. Tests cover a fresh HTTP client and verified
+session on SQLite/PostgreSQL, plus dashboard and login/deep-link navigation in UI.
 
 ## Review Q&A and its test harness (S2-003)
 
@@ -381,3 +407,92 @@ truncation occurs. Context is rebuilt on every request and contains no prior
 target's history. Insufficient evidence is reported explicitly instead of
 inferred from general knowledge. See [the research and architecture decision](docs/qa-context-design.md)
 for limits, provider requirements and deterministic acceptance coverage.
+
+### Saved questions and responses (S3-006)
+
+Apply `backend/migrations/0005_create_question_exchanges.sql` in migration order
+**before deploying this backend**. It adds `question_exchanges` and enables RLS
+without public policies; application access remains through FastAPI only. This
+migration is not applied automatically to an existing/shared database.
+
+The existing `POST /api/targets/{target_id}/questions` automatically saves each
+completed exchange before returning its unchanged response contract. Stored fields
+are a stable UUID, target ID, trimmed question, answer, outcome, review count at
+answer time, and UTC creation timestamp. `answered`, `insufficient_evidence`, and
+`out_of_scope` preserve the actual returned text. A direct API request against an
+empty target saves `no_reviews` with a null answer and zero count, allowing the UI
+to reconstruct its empty-data state without claiming an AI answer was generated.
+Unauthorized/invalid requests, oversized context, and provider failures create no
+exchange. A storage failure rolls back the pair and returns safe 503 rather than
+reporting it as saved. Retrying a completed POST creates a separate exchange;
+request idempotency is not implemented.
+
+`GET /api/targets/{target_id}/questions?limit=50&offset=0` returns a JSON array of
+saved exchanges, oldest creation timestamp first, then UUID for stable ties.
+`limit` accepts 1–100 and `offset` is nonnegative. The response includes all stored
+fields above; an owned target with no history returns `[]`. Both endpoints derive
+ownership from verified authentication; inaccessible and nonexistent targets share
+404. Creation time records completion/persistence, not the start of a model call.
+
+Answers are stored as historical results, not recomputed when reviews change.
+No review text snapshots or supporting-evidence citations are stored: the current
+model contract supplies no citations, and `review_count` is only an answer-time
+count, not a reproducible dataset snapshot. Saved history is not supplied to the
+model or mixed into another target's context. Deleting a target deletes its
+history atomically. S3-007 covers restoring history in the workspace UI; this story
+provides persistence and the retrieval API; S3-007 below adds history restoration.
+
+### Restore Q&A history (S3-007)
+
+Opening `/targets/{target_id}` loads **Q&A history** from the protected questions
+GET endpoint, including when the target currently has no reviews or the review
+summary is unavailable. Questions, saved answers, outcome labels, and creation
+timestamps are shown oldest first in the backend's `(created_at, id)` order.
+Timestamps display in the browser's local timezone; formatting never changes
+the underlying order. `no_reviews` entries show their original lack-of-data state.
+
+History uses 50-record pages with **Previous questions** / **Next questions**;
+long histories are not silently truncated. When exactly 50 records end a page,
+the next page can be empty and explicitly says no more questions are available.
+The current question/response remains separate; after a successful saved response,
+the history reloads from its first page. A failed question does not refresh or
+discard saved history. **Refresh workspace** reloads history as well.
+
+Switching targets or authentication context unmounts the history view, aborts
+pending reads, and loads only the newly selected target's history. Late responses
+from the previous target/account are ignored. A page containing another target's
+records is rejected rather than displayed. Server authentication/ownership checks
+remain authoritative. History failures provide safe retry actions without hiding
+the rest of the workspace; 401 expires the session and 403/404 use the same
+unavailable-target state as other protected reads. Reading or retrying history
+never calls the model, and saved exchanges never become AI prompt context.
+
+No new migration is needed beyond S3-006's `0005_create_question_exchanges.sql`,
+which must be installed before this combined backend/frontend is deployed.
+
+### Clear Q&A history (S3-008)
+
+Use **Clear Q&A history** below the history section. The confirmation names the
+active target, initially focuses Cancel, and explains that only saved questions
+and responses will be removed. This differs from **Target actions → Delete target**,
+which deletes the analysis and its associated records. Confirming history clearing
+resets the current question/response display and draft, reloads saved history from
+its first page, and shows a success message. The workspace, source link, persisted
+reviews, latest ingestion state, and review summary remain intact.
+
+`DELETE /api/targets/{target_id}/questions` verifies the authenticated owner, locks
+the parent target, deletes all of that target's exchanges (not just the displayed
+page), and commits once before returning an empty 204. Clearing an already empty
+history is also 204. Another user's and nonexistent targets share 404. Database
+failures roll back and return a safe 503; the UI retains its existing history and
+offers retry in the confirmation dialog. No other tables are written or deleted.
+
+While clearing, the dialog prevents duplicate confirmation and cancellation, and
+new questions and workspace refresh are disabled. While a question is processing in this
+workspace, clearing is disabled with an explanation. Changing target/account
+unmounts the action, aborts its browser request, and ignores stale completion;
+aborting the browser request does not guarantee cancellation of the server write.
+Clearing removes exchanges visible to its database transaction. It does not cancel
+model work in other tabs/clients: a later committed answer is a new history entry.
+The saved reviews remain available for subsequent questions. No additional
+migration or provider call is needed beyond the existing S3-006 schema.

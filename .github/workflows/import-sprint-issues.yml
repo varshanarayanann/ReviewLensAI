@@ -6,7 +6,7 @@ on:
       csv_path:
         description: "Path to the sprint issue CSV file in this repository"
         required: true
-        default: "Sprint2Issues.csv"
+        default: "Sprint3Issues.csv"
         type: string
       dry_run:
         description: "Preview what would be created without creating issues"

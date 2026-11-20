@@ -172,6 +172,22 @@ panel under the target details alongside the existing summary and ingestion
 controls. It submits one question to `POST /api/targets/{id}/questions`, shows
 progress and the current response, and keeps the question available for retry.
 
+**S3-007:** A separate **Q&A history** section restores saved exchanges on opening
+the workspace. Display question, answer/outcome, and local creation time in the
+backend's oldest-first order, with 50-record Previous/Next pagination and explicit
+loading, empty, error, and retry states. It remains available without current
+review data. Successful new questions refresh saved history; target/account
+changes clear it and cancel stale requests. Render all stored content as text.
+
+**S3-008:** **Clear Q&A history** is a secondary action beneath saved history,
+separate from **Target actions → Delete target**. Its named confirmation explains
+that the target, source, reviews, and ingestion summary are preserved. Cancel
+receives initial focus; pending confirmation says Clearing and prevents duplicate
+actions. Clear is disabled during a local question, and asking is disabled during
+clearing. Success resets the current Q&A display/draft and reloads history; failure
+retains the existing history with a safe retry message inside the dialog. Dialog
+labels use unique IDs because both destructive actions can exist in one workspace.
+
 **S2-020:** Offer the question form when the persisted review summary confirms
 that the active target has reviews. With zero reviews, show guidance to use
 **Ingest reviews**. After a failed ingestion, use the persisted count to determine whether
@@ -187,6 +203,15 @@ for backend use and tests. See
 
 1. **Ingestion panel**: latest ingestion state, the primary `Ingest reviews` action (from the source URL), and the result message of the latest attempt.
 2. **Reviews panel**: persisted reviews for this target (`Reviews (N)` header + list), or an empty state if none.
+
+**S3-004:** The current inline workspace provides **View saved reviews** under
+`Reviews (N)`. Opening it loads 20 persisted reviews per page, with Previous/Next
+controls and safe loading/retry states. Hiding/reopening reloads the page from
+the backend. Ratings include numeric text; rating-only records say no written
+review is present. Original review text is rendered as text, clamped to four
+lines with Show more/Show less for long content. Reopening a saved target reloads
+its context, latest ingestion result, and summary; it never starts ingestion.
+Q&A history restoration is a separate story (S3-007).
 
 The analysis workspace's **Switch target** action (S2-017) lists the user's
 other analysis targets by name and source. Selecting a target opens its

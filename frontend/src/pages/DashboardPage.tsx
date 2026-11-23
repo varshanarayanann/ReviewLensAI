@@ -65,7 +65,7 @@ function TargetList({ apiBaseUrl, accessToken }: { apiBaseUrl: string; accessTok
 export default function DashboardPage({ apiBaseUrl }: { apiBaseUrl: string }) {
   const { session } = useAuth()
   return (
-    <AppShell>
+    <AppShell apiBaseUrl={apiBaseUrl}>
       <PageHeader title="Dashboard" description="Your analysis targets"
         action={<Link className="button button--primary button-link" to="/targets/new">New target</Link>} />
       {session && <TargetList key={`${apiBaseUrl}:${session.user.id}:${session.access_token}`}

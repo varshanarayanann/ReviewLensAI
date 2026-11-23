@@ -1,3 +1,4 @@
+import { stubFetchWithEmptyHistory } from '../test/emptyHistory'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { expect, it, vi } from 'vitest'
@@ -29,7 +30,7 @@ it('collects from the saved source and reloads the persisted review summary', as
     if (url === endpoint) { saved = true; return Promise.resolve(json(result)) }
     return Promise.resolve(workspaceResponse(url, saved ? 2 : 0))
   })
-  vi.stubGlobal('fetch', fetchMock)
+  stubFetchWithEmptyHistory(fetchMock)
   showWorkspace()
   fireEvent.click(await screen.findByRole('button', { name: 'Ingest reviews' }))
   expect(await screen.findByText(result.message)).toBeInTheDocument()
@@ -46,7 +47,7 @@ it('blocks repeated collection and refresh while the provider is pending', async
   const pending = new Promise<Response>((resolve) => { complete = resolve })
   const fetchMock = vi.fn((url: string) => url === endpoint
     ? pending : Promise.resolve(workspaceResponse(url)))
-  vi.stubGlobal('fetch', fetchMock)
+  stubFetchWithEmptyHistory(fetchMock)
   showWorkspace()
   const button = await screen.findByRole('button', { name: 'Ingest reviews' })
   fireEvent.click(button)
@@ -59,7 +60,7 @@ it('blocks repeated collection and refresh while the provider is pending', async
 })
 
 it.each([503, 0])('shows a safe collection error (%s) and allows retry', async (status) => {
-  vi.stubGlobal('fetch', vi.fn((url: string) => {
+  stubFetchWithEmptyHistory(vi.fn((url: string) => {
     if (url !== endpoint) return Promise.resolve(workspaceResponse(url))
     return status ? Promise.resolve(json({ detail: 'secret provider details' }, status))
       : Promise.reject(new TypeError('secret network details'))
@@ -73,7 +74,7 @@ it.each([503, 0])('shows a safe collection error (%s) and allows retry', async (
 
 it.each([[401, 'Log in'], [404, 'Analysis target not found']])(
   'handles an authorization failure during collection (%s)', async (status, heading) => {
-    vi.stubGlobal('fetch', vi.fn((url: string) => Promise.resolve(url === endpoint
+    stubFetchWithEmptyHistory(vi.fn((url: string) => Promise.resolve(url === endpoint
       ? json({}, status) : workspaceResponse(url))))
     showWorkspace()
     fireEvent.click(await screen.findByRole('button', { name: 'Ingest reviews' }))
@@ -82,7 +83,7 @@ it.each([[401, 'Log in'], [404, 'Analysis target not found']])(
 )
 
 it('shows a recorded failed collection and retains the saved dataset', async () => {
-  vi.stubGlobal('fetch', vi.fn((url: string) => Promise.resolve(url === endpoint
+  stubFetchWithEmptyHistory(vi.fn((url: string) => Promise.resolve(url === endpoint
     ? json({ ...result, state: 'failed', persisted_count: 0, message: 'Reviews could not be collected. Try again shortly.' })
     : workspaceResponse(url, 3))))
   showWorkspace()

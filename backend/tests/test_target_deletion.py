@@ -2,10 +2,11 @@ from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 import pytest
+from sqlalchemy import select
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
-from app.models import AnalysisTarget
+from app.models import AnalysisTarget, QuestionExchange
 from app.models.ingestion import IngestionRun
 from tests.test_ingestion_submission import source_targets as source_targets
 from tests.test_ingestion_submission import stored_rows
@@ -20,6 +21,27 @@ def seed_reviews(client, headers, target):
     )
     assert response.status_code == 200
     return response.json()
+
+
+def seed_qa(database, target_id: str, question: str):
+    with Session(database) as db:
+        db.add(
+            QuestionExchange(
+                target_id=UUID(target_id),
+                question=question,
+                answer="Saved answer",
+                status="answered",
+                review_count=1,
+            )
+        )
+        db.commit()
+
+
+def history_target_ids(database):
+    with Session(database) as db:
+        return {
+            str(row) for row in db.scalars(select(QuestionExchange.target_id)).all()
+        }
 
 
 def test_delete_requires_authentication_before_database_access(client):
@@ -54,6 +76,31 @@ def test_delete_removes_only_owned_target_and_children(
     assert str(after["ingestion_runs"][0].target_id) == other_target
     assert client.get(f"/api/targets/{target}", headers=owner).status_code == 404
     assert client.delete(f"/api/targets/{target}", headers=owner).status_code == 404
+
+
+def test_delete_clears_qa_history_for_target_and_leaves_others(
+    client, database, source_targets
+):
+    """S3-005: cascading delete removes this target's Q&A only."""
+    owner, target = source_targets[0]
+    other_owner, other_target = source_targets[1]
+    seed_reviews(client, owner, target)
+    seed_reviews(client, other_owner, other_target)
+    seed_qa(database, target, "Deleted target question")
+    seed_qa(database, other_target, "Other target question")
+    assert history_target_ids(database) == {target, other_target}
+
+    response = client.delete(f"/api/targets/{target}", headers=owner)
+    assert response.status_code == 204
+    assert history_target_ids(database) == {other_target}
+    questions = client.get(f"/api/targets/{target}/questions", headers=owner)
+    assert questions.status_code == 404
+    remaining = client.get(
+        f"/api/targets/{other_target}/questions", headers=other_owner
+    ).json()
+    assert len(remaining) == 1
+    assert remaining[0]["question"] == "Other target question"
+    assert remaining[0]["target_id"] == other_target
 
 
 def test_missing_and_other_users_targets_share_safe_denial(

@@ -2,6 +2,31 @@
 
 ## Google Maps ingestion update
 
+S3-008 adds confirmed **Clear Q&A history** and protected
+`DELETE /api/targets/{target_id}/questions`. Only target-owned exchanges are deleted
+transactionally; target/source/reviews/ingestion records and summaries remain.
+The UI resets current Q&A only after success and prevents local clear/ask overlap.
+New answers committed later by other clients can create new history. Shared
+ConfirmDialog uses unique IDs and supports action-specific pending labels.
+
+S3-007 restores owner-scoped Q&A history in the workspace, oldest first, in
+50-record pages. Target/auth changes unmount the history and abort pending reads;
+newly saved answers refresh it. Empty/failed datasets still allow history reads.
+History is rendered as text and never supplied to the model. Migration 0005 from
+S3-006 is required; this UI change adds no further migration.
+
+S3-004 reopens saved workspaces through their existing target route/dashboard and
+adds **View saved reviews** with 20-record pagination, rating-only display, safe
+retry, and request cancellation on target/account changes. Details, latest run,
+and summary reload from persisted APIs; reopening never initiates ingestion.
+Q&A history UI restoration remains separate (S3-007).
+
+S3-006 adds saved Q&A in `question_exchanges` (migration 0005, apply before backend
+deployment). Completed question requests persist question/answer/status/count and
+UTC timestamp under the authorized target. `GET /api/targets/{target_id}/questions`
+provides owner-scoped paginated history; target deletion removes it atomically.
+This saved display history is never included in AI context. S3-007 owns UI restore.
+
 Target workspaces also expose **Target actions → Delete target** with a native
 confirmation dialog. `DELETE /api/targets/{target_id}` checks verified ownership
 and atomically removes reviews, ingestion runs, and the target. Recent processing

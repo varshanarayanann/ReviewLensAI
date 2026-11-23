@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
-import { ApiError, deleteTarget } from '../../lib/api/client'
+import { ApiError, deleteTarget, notifyTargetsChanged } from '../../lib/api/client'
 import { useAuth } from '../../lib/auth/AuthContext'
 import { MESSAGES } from '../../lib/messages'
 import { Alert } from '../ui/Alert'
@@ -34,7 +34,10 @@ export function DeleteTargetAction({ apiBaseUrl, targetId, targetName, token, di
     setError('')
     try {
       await deleteTarget(apiBaseUrl, targetId, token, controller.signal)
-      if (!controller.signal.aborted) void navigate('/dashboard', { replace: true })
+      if (!controller.signal.aborted) {
+        notifyTargetsChanged()
+        void navigate('/dashboard', { replace: true })
+      }
     } catch (failure) {
       if (controller.signal.aborted) return
       if (failure instanceof ApiError && failure.status === 401) {
@@ -60,7 +63,7 @@ export function DeleteTargetAction({ apiBaseUrl, targetId, targetName, token, di
       {disabled && <p className="muted">{MESSAGES.targetDeleteBusy}</p>}
     </details>
     <ConfirmDialog open={open} title={`Delete “${targetName}”?`}
-      description="This permanently removes the target, all its reviews, and its ingestion history. This can't be undone."
+      description="This permanently removes the target, all its reviews, ingestion history, and saved Q&A history. This can't be undone."
       confirmLabel="Delete target" pending={pending} onConfirm={() => void confirm()}
       onCancel={() => { setOpen(false); trigger.current?.focus() }}>
       {error && <Alert variant="danger">{error}</Alert>}

@@ -13,13 +13,18 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import get_current_user
 from app.auth.tokens import CurrentUser
 from app.db import get_db
-from app.models import AnalysisTarget
+from app.models import AnalysisTarget, QuestionExchange
 from app.models.ingestion import IngestionRun, Review
 from app.reviews.csv_source import ReviewSourceError, parse_csv_reviews
 from app.reviews.google_maps import ApifyReviewSource, ReviewCollectionError
 from app.reviews.normalization import normalize_reviews
 from app.schemas import target_list
-from app.schemas.analysis_target import AnalysisTargetCreate, AnalysisTargetRead
+from app.schemas.analysis_target import (
+    AnalysisTargetCopy,
+    AnalysisTargetCreate,
+    AnalysisTargetRead,
+    AnalysisTargetUpdate,
+)
 from app.schemas.ingestion_result import IngestionResult
 from app.schemas.review import ReviewResponse
 from app.schemas.review_summary import ReviewSummary
@@ -55,6 +60,94 @@ def owned(target_id: UUID, user: CurrentUser, db: Session) -> AnalysisTarget:
     return target
 
 
+@router.patch("/{target_id}", response_model=AnalysisTargetRead)
+def rename_target(
+    target_id: UUID,
+    body: AnalysisTargetUpdate,
+    user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    target = owned(target_id, user, db)
+    target.name = body.name
+    db.commit()
+    db.refresh(target)
+    return target
+
+
+@router.post("/{target_id}/copies", status_code=201, response_model=AnalysisTargetRead)
+def copy_target(
+    target_id: UUID,
+    body: AnalysisTargetCopy,
+    user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Save As: new identity with copied reviews and Q&A; source stays untouched."""
+    source = owned(target_id, user, db)
+    try:
+        copy = AnalysisTarget(
+            id=uuid4(),
+            owner_id=source.owner_id,
+            name=body.name,
+            platform=source.platform,
+            source_url=source.source_url,
+        )
+        db.add(copy)
+        db.flush()
+
+        reviews = db.scalars(
+            select(Review).where(Review.target_id == source.id).order_by(Review.id)
+        ).all()
+        if reviews:
+            run = IngestionRun(
+                target_id=copy.id,
+                state="succeeded",
+                persisted_count=len(reviews),
+                rejected_count=0,
+            )
+            db.add(run)
+            db.flush()
+            for review in reviews:
+                db.add(
+                    Review(
+                        target_id=copy.id,
+                        run_id=run.id,
+                        review_text=review.review_text,
+                        rating=review.rating,
+                    )
+                )
+
+        for exchange in db.scalars(
+            select(QuestionExchange)
+            .where(QuestionExchange.target_id == source.id)
+            .order_by(QuestionExchange.created_at, QuestionExchange.id)
+        ).all():
+            db.add(
+                QuestionExchange(
+                    target_id=copy.id,
+                    question=exchange.question,
+                    answer=exchange.answer,
+                    status=exchange.status,
+                    review_count=exchange.review_count,
+                    created_at=exchange.created_at,
+                )
+            )
+
+        db.commit()
+        db.refresh(copy)
+    except SQLAlchemyError as exc:
+        try:
+            db.rollback()
+        except SQLAlchemyError as rollback_error:
+            logger.error(
+                "Target copy rollback failed (%s)", type(rollback_error).__name__
+            )
+        logger.warning("Target %s copy failed (%s)", target_id, type(exc).__name__)
+        raise HTTPException(
+            503, "The analysis could not be copied. Try again shortly."
+        ) from None
+    return copy
+
+
 @router.delete("/{target_id}", status_code=204)
 def delete_target(
     target_id: UUID,
@@ -85,6 +178,9 @@ def delete_target(
             raise HTTPException(
                 409, "Reviews are being collected. Try deleting the target later."
             )
+        db.execute(
+            delete(QuestionExchange).where(QuestionExchange.target_id == target_id)
+        )
         db.execute(delete(Review).where(Review.target_id == target_id))
         db.execute(delete(IngestionRun).where(IngestionRun.target_id == target_id))
         db.execute(delete(AnalysisTarget).where(AnalysisTarget.id == target_id))

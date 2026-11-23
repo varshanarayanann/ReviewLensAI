@@ -1,3 +1,4 @@
+import { stubFetchWithEmptyHistory } from '../test/emptyHistory'
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter, useNavigate } from 'react-router'
 import { expect, it, vi } from 'vitest'
@@ -12,6 +13,7 @@ const library = { id: 'library', name: 'Library', platform: 'google_maps', sourc
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status })
 
 function workspaceResponse(url: string) {
+  if (url === targetsUrl) return json([cafe, library])
   if (url.startsWith(`${targetsUrl}/other-user`)) return json({}, 404)
   const target = url.startsWith(`${targetsUrl}/library`) ? library : cafe
   if (url.endsWith('/ingestions/latest')) {
@@ -45,12 +47,11 @@ async function openSwitcher() {
 }
 
 it('switches to an owned target and reloads its workspace and summary', async () => {
-  const fetchMock = vi.fn((url: string) => Promise.resolve(url === targetsUrl
-    ? json([cafe, library]) : workspaceResponse(url)))
-  vi.stubGlobal('fetch', fetchMock)
+  const fetchMock = vi.fn((url: string) => Promise.resolve(workspaceResponse(url)))
+  stubFetchWithEmptyHistory(fetchMock)
   showWorkspace()
   expect(await screen.findByText('1 review')).toBeInTheDocument()
-  expect(fetchMock.mock.calls.some(([url]) => url === targetsUrl)).toBe(false)
+  expect(fetchMock.mock.calls.some(([url]) => url === targetsUrl)).toBe(true)
 
   const switcher = await openSwitcher()
   expect(switcher.queryByRole('link', { name: /^Cafe/ })).not.toBeInTheDocument()
@@ -73,7 +74,7 @@ it('switches to an owned target and reloads its workspace and summary', async ()
 })
 
 it('reports when the active target is the only owned target', async () => {
-  vi.stubGlobal('fetch', vi.fn((url: string) => Promise.resolve(url === targetsUrl
+  stubFetchWithEmptyHistory(vi.fn((url: string) => Promise.resolve(url === targetsUrl
     ? json([cafe]) : workspaceResponse(url))))
   showWorkspace()
   const switcher = await openSwitcher()
@@ -84,9 +85,14 @@ it('reports when the active target is the only owned target', async () => {
 it('keeps the workspace available while the target list loads and after a list error', async () => {
   let finish!: (response: Response) => void
   const pending = new Promise<Response>((resolve) => { finish = resolve })
-  const listRequest = vi.fn().mockReturnValueOnce(pending).mockResolvedValueOnce(json([cafe, library]))
-  vi.stubGlobal('fetch', vi.fn((url: string) => url === targetsUrl
-    ? listRequest() : Promise.resolve(workspaceResponse(url))))
+  let listCalls = 0
+  stubFetchWithEmptyHistory(vi.fn((url: string) => {
+    if (url === targetsUrl) {
+      listCalls += 1
+      return listCalls <= 2 ? pending : Promise.resolve(json([cafe, library]))
+    }
+    return Promise.resolve(workspaceResponse(url))
+  }))
   showWorkspace()
   const switcher = await openSwitcher()
   expect(switcher.getByRole('status')).toHaveTextContent('Loading analysis targets')
@@ -100,9 +106,9 @@ it('keeps the workspace available while the target list loads and after a list e
 
 it('keeps another user’s target unavailable when opened directly', async () => {
   const fetchMock = vi.fn((url: string) => Promise.resolve(workspaceResponse(url)))
-  vi.stubGlobal('fetch', fetchMock)
+  stubFetchWithEmptyHistory(fetchMock)
   showWorkspace('/targets/other-user')
   expect(await screen.findByRole('heading', { name: 'Analysis target not found' })).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Switch target' })).not.toBeInTheDocument()
-  expect(fetchMock).toHaveBeenCalledTimes(1)
+  expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/other-user'))).toBe(true)
 })

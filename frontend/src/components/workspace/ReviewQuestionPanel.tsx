@@ -17,9 +17,12 @@ interface ReviewQuestionPanelProps {
   targetName: string
   token: string
   onAccessDenied: () => void
+  onAnswerSaved?: () => void
+  onBusyChange?: (busy: boolean) => void
+  disabled?: boolean
 }
 
-export function ReviewQuestionPanel({ apiBaseUrl, targetId, targetName, token, onAccessDenied }: ReviewQuestionPanelProps) {
+export function ReviewQuestionPanel({ apiBaseUrl, targetId, targetName, token, onAccessDenied, onAnswerSaved, onBusyChange, disabled = false }: ReviewQuestionPanelProps) {
   const { expireSession } = useAuth()
   const [question, setQuestion] = useState('')
   const [fieldError, setFieldError] = useState('')
@@ -29,7 +32,10 @@ export function ReviewQuestionPanel({ apiBaseUrl, targetId, targetName, token, o
   const input = useRef<HTMLTextAreaElement>(null)
   const request = useRef<AbortController | null>(null)
 
-  useEffect(() => () => request.current?.abort(), [])
+  useEffect(() => () => {
+    request.current?.abort()
+    onBusyChange?.(false)
+  }, [onBusyChange])
 
   if (answer?.status === 'no_reviews') {
     return <p aria-live="polite" className="muted">{MESSAGES.questionNoReviews}</p>
@@ -37,7 +43,7 @@ export function ReviewQuestionPanel({ apiBaseUrl, targetId, targetName, token, o
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (request.current) return
+    if (request.current || disabled) return
 
     const text = question.trim()
     const validationError = !text ? MESSAGES.questionRequired
@@ -51,6 +57,7 @@ export function ReviewQuestionPanel({ apiBaseUrl, targetId, targetName, token, o
     const controller = new AbortController()
     request.current = controller
     setBusy(true)
+    onBusyChange?.(true)
     setError('')
     setAnswer(null)
     try {
@@ -61,6 +68,7 @@ export function ReviewQuestionPanel({ apiBaseUrl, targetId, targetName, token, o
         return
       }
       setAnswer(response)
+      onAnswerSaved?.()
     } catch (failure) {
       if (controller.signal.aborted) return
       if (failure instanceof ApiError) {
@@ -72,7 +80,10 @@ export function ReviewQuestionPanel({ apiBaseUrl, targetId, targetName, token, o
       }
     } finally {
       request.current = null
-      if (!controller.signal.aborted) setBusy(false)
+      if (!controller.signal.aborted) {
+        setBusy(false)
+        onBusyChange?.(false)
+      }
     }
   }
 
@@ -83,12 +94,12 @@ export function ReviewQuestionPanel({ apiBaseUrl, targetId, targetName, token, o
         <p id="review-question-help" className="muted">
           Ask about saved reviews for {targetName}. Use up to {MAX_QUESTION_LENGTH.toLocaleString('en-US')} characters.
         </p>
-        <textarea id="review-question" ref={input} rows={3} required readOnly={busy}
+        <textarea id="review-question" ref={input} rows={3} required readOnly={busy || disabled}
           value={question} aria-invalid={!!fieldError}
           aria-describedby={`review-question-help${fieldError ? ' review-question-error' : ''}`}
           onChange={(event) => { setQuestion(event.target.value); setFieldError('') }} />
         {fieldError && <div id="review-question-error"><Alert variant="danger">{fieldError}</Alert></div>}
-        <button className="button button--primary" disabled={busy}>
+        <button className="button button--primary" disabled={busy || disabled}>
           {busy ? 'Asking...' : 'Ask question'}
         </button>
       </form>

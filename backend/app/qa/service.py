@@ -3,7 +3,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import AnalysisTarget
+from app.models import AnalysisTarget, QuestionExchange
 from app.qa.context import review_context
 from app.qa.llm import LLMClient, LLMRequest
 from app.qa.prompt import build_system_prompt
@@ -26,12 +26,14 @@ def answer_question(
         raise TargetNotFoundError
     reviews = review_context(db, owner_id, target.id)
     if not reviews:
-        return QuestionAnswer(
+        result = QuestionAnswer(
             target_id=target.id,
             status=AnswerStatus.NO_REVIEWS,
             answer=None,
             review_count=0,
         )
+        save_exchange(db, question, result)
+        return result
     response = llm.complete(
         LLMRequest(
             system_prompt=build_system_prompt(target),
@@ -39,9 +41,25 @@ def answer_question(
             reviews=reviews,
         )
     )
-    return QuestionAnswer(
+    result = QuestionAnswer(
         target_id=target.id,
         status=AnswerStatus(response.outcome.value),
         answer=response.text,
         review_count=len(reviews),
     )
+    save_exchange(db, question, result)
+    return result
+
+
+def save_exchange(db: Session, question: str, result: QuestionAnswer) -> None:
+    db.add(
+        QuestionExchange(
+            target_id=result.target_id,
+            question=question,
+            answer=result.answer,
+            status=result.status.value,
+            review_count=result.review_count,
+        )
+    )
+    # A successful response is returned only after the complete pair is durable.
+    db.commit()

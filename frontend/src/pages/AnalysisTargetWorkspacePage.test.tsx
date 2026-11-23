@@ -1,3 +1,4 @@
+import { stubFetchWithEmptyHistory } from '../test/emptyHistory'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { Link, MemoryRouter } from 'react-router'
 import { beforeEach, expect, it, vi } from 'vitest'
@@ -16,9 +17,10 @@ const persistenceFailure = { run_id: 'run-failure', target_id: target.id, state:
 const emptySummary: ReviewSummaryResponse = { target_id: target.id, review_count: 0, average_rating: null }
 const populatedSummary = { target_id: target.id, review_count: 2, average_rating: 4 }
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status })
-let fetchMock: ReturnType<typeof vi.fn>
+let fetchMock: ReturnType<typeof vi.fn<(url: string, options?: RequestInit) => Promise<Response>>>
 
 function defaultResponse(url: string, summary = emptySummary) {
+  if (url === 'http://api.test/api/targets') return []
   if (url.endsWith('/latest')) return null
   if (url.endsWith('/reviews/summary')) return summary
   return target
@@ -26,7 +28,7 @@ function defaultResponse(url: string, summary = emptySummary) {
 
 beforeEach(() => {
   fetchMock = vi.fn((url: string) => Promise.resolve(json(defaultResponse(url))))
-  vi.stubGlobal('fetch', fetchMock)
+  stubFetchWithEmptyHistory(fetchMock)
 })
 
 function showWorkspace(path = '/targets/target-a', fake = createFakeAuth(fakeSession())) {
@@ -225,12 +227,15 @@ it('loads the authorized target, real platform, source link, and no-run state', 
   expect(screen.getByRole('link', { name: target.source_url })).toHaveAttribute('rel', 'noopener noreferrer')
   expect(screen.getByText('Not ingested')).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Ingest reviews' })).toBeEnabled()
-  expect(fetchMock).toHaveBeenNthCalledWith(1, 'http://api.test/api/targets/target-a', expect.objectContaining({
+  expect(fetchMock).toHaveBeenCalledWith('http://api.test/api/targets/target-a', expect.objectContaining({
     headers: expect.objectContaining({ Authorization: 'Bearer test-access-token' }),
   }))
-  expect(fetchMock).toHaveBeenNthCalledWith(2, 'http://api.test/api/targets/target-a/ingestions/latest', expect.anything())
-  expect(fetchMock).toHaveBeenNthCalledWith(3, 'http://api.test/api/targets/target-a/reviews/summary', expect.objectContaining({
+  expect(fetchMock).toHaveBeenCalledWith('http://api.test/api/targets/target-a/ingestions/latest', expect.anything())
+  expect(fetchMock).toHaveBeenCalledWith('http://api.test/api/targets/target-a/reviews/summary', expect.objectContaining({
     headers: expect.objectContaining({ Authorization: expect.any(String) }),
+  }))
+  expect(fetchMock).toHaveBeenCalledWith('http://api.test/api/targets', expect.objectContaining({
+    headers: { Authorization: 'Bearer test-access-token' },
   }))
   expect(screen.getByText('0 reviews')).toBeInTheDocument()
   expect(screen.getByText('No ratings yet')).toBeInTheDocument()
@@ -294,19 +299,27 @@ it('shows a loading state without an ingestion action while data is pending', as
 })
 
 it.each([[403], [404]])('maps access response %s to the same safe unavailable state', async (status) => {
-  fetchMock.mockImplementation(() => Promise.resolve(json({ detail: 'private raw detail' }, status)))
+  fetchMock.mockImplementation((url: string) => Promise.resolve(
+    url === 'http://api.test/api/targets'
+      ? json([])
+      : json({ detail: 'private raw detail' }, status),
+  ))
   showWorkspace()
   expect(await screen.findByRole('alert')).toHaveTextContent(MESSAGES.targetNotFound)
   expect(screen.queryByText(target.name)).not.toBeInTheDocument()
   expect(screen.queryByText('private raw detail')).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Ingest reviews' })).not.toBeInTheDocument()
-  expect(fetchMock).toHaveBeenCalledTimes(1)
+  expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/targets/target-a'))).toBe(true)
 })
 
 it('shows safe load failure and refreshes successfully', async () => {
-  fetchMock.mockImplementationOnce(() => Promise.reject(new Error('sensitive network detail')))
+  fetchMock.mockImplementation((url: string) => {
+    if (url === 'http://api.test/api/targets') return Promise.resolve(json([]))
+    return Promise.reject(new Error('sensitive network detail'))
+  })
   showWorkspace()
   expect(await screen.findByRole('alert')).toHaveTextContent(MESSAGES.offline)
+  fetchMock.mockImplementation((url: string) => Promise.resolve(json(defaultResponse(url))))
   fireEvent.click(screen.getByRole('button', { name: 'Refresh workspace' }))
   expect(await screen.findByRole('heading', { name: target.name })).toBeInTheDocument()
   expect(screen.queryByText(/sensitive/)).not.toBeInTheDocument()
@@ -358,8 +371,8 @@ it('collects for the active target and displays the persisted result after refre
   await screen.findByRole('heading', { name: target.name })
   ingestReviews()
   expect(await screen.findByText('Ingested')).toBeInTheDocument()
-  expect(screen.getByRole('status')).toHaveClass('alert--success')
-  expect(screen.getByRole('status')).toHaveTextContent('Imported 1 review; rejected 0 records.')
+  expect(screen.getByText('Imported 1 review; rejected 0 records.')).toHaveClass('alert--success')
+  expect(screen.getByText('Imported 1 review; rejected 0 records.')).toHaveAttribute('role', 'status')
   expect(fetchMock).toHaveBeenCalledWith(collectUrl, expect.objectContaining({ method: 'POST', body: '{}' }))
   expect(await screen.findByText('1 review')).toBeInTheDocument()
   expect(screen.getByText('5.0 / 5')).toBeInTheDocument()
@@ -383,7 +396,8 @@ it('shows partial ingestion counts with warning semantics', async () => {
   await screen.findByRole('heading', { name: target.name })
   ingestReviews()
 
-  const alert = await screen.findByRole('status')
+  const alert = await screen.findByText(partial.message)
+  expect(alert).toHaveAttribute('role', 'status')
   expect(alert).toHaveClass('alert--warning')
   expect(alert).toHaveTextContent('Imported 2 reviews; rejected 1 record.')
   expect(screen.getByText('Partially ingested')).toHaveClass('workspace-status--partial')
@@ -435,11 +449,12 @@ it('restores the latest partial outcome and warning alert after workspace refres
   showWorkspace()
   await screen.findByRole('heading', { name: target.name })
   ingestReviews()
-  expect(await screen.findByRole('status')).toHaveTextContent(partial.message)
+  expect(await screen.findByText(partial.message)).toHaveAttribute('role', 'status')
 
   fireEvent.click(screen.getByRole('button', { name: 'Refresh workspace' }))
 
-  const restored = await screen.findByRole('status')
+  const restored = await screen.findByText(partial.message)
+  expect(restored).toHaveAttribute('role', 'status')
   expect(restored).toHaveClass('alert--warning')
   expect(restored).toHaveTextContent('Imported 2 reviews; rejected 1 record.')
   expect(screen.getByText('Partially ingested')).toHaveClass('workspace-status--partial')

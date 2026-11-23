@@ -33,11 +33,44 @@ export interface ReviewSummaryResponse {
   average_rating: number | null
 }
 
+export interface PersistedReviewResponse {
+  id: string
+  target_id: string
+  run_id: string
+  review_text: string
+  rating: number
+}
+
+export function getSavedReviews(base: string, targetId: string, token: string, offset: number, signal: AbortSignal) {
+  return targetRequest<PersistedReviewResponse[]>(
+    base, `/${encodeURIComponent(targetId)}/reviews?limit=20&offset=${offset}`, token, undefined, signal,
+  )
+}
+
 export interface ReviewAnswerResponse {
   target_id: string
   status: 'answered' | 'insufficient_evidence' | 'out_of_scope' | 'no_reviews'
   answer: string | null
   review_count: number
+}
+
+export interface QuestionExchangeResponse extends ReviewAnswerResponse {
+  id: string
+  question: string
+  created_at: string
+}
+
+export function getQuestionHistory(base: string, targetId: string, token: string, offset: number, signal: AbortSignal) {
+  return targetRequest<QuestionExchangeResponse[]>(
+    base, `/${encodeURIComponent(targetId)}/questions?limit=50&offset=${offset}`, token, undefined, signal,
+  )
+}
+
+export async function clearQuestionHistory(base: string, targetId: string, token: string, signal: AbortSignal): Promise<void> {
+  const response = await fetch(`${base}/api/targets/${encodeURIComponent(targetId)}/questions`, {
+    method: 'DELETE', headers: { Authorization: `Bearer ${token}` }, signal,
+  })
+  if (!response.ok) throw new ApiError(response.status)
 }
 
 export function askReviewQuestion(base: string, targetId: string, token: string, question: string, signal: AbortSignal) {
@@ -83,6 +116,68 @@ export async function deleteTarget(base: string, targetId: string, token: string
     signal,
   })
   if (!response.ok) throw new ApiError(response.status)
+}
+
+export async function renameTarget(
+  base: string,
+  targetId: string,
+  token: string,
+  name: string,
+  signal?: AbortSignal,
+): Promise<WorkspaceTargetResponse> {
+  const response = await fetch(`${base}/api/targets/${encodeURIComponent(targetId)}`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    ...(signal ? { signal } : {}),
+    body: JSON.stringify({ name }),
+  })
+  if (!response.ok) throw new ApiError(response.status)
+  return (await response.json()) as WorkspaceTargetResponse
+}
+
+export async function copyTarget(
+  base: string,
+  targetId: string,
+  token: string,
+  name: string,
+  signal?: AbortSignal,
+): Promise<WorkspaceTargetResponse> {
+  const response = await fetch(
+    `${base}/api/targets/${encodeURIComponent(targetId)}/copies`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      ...(signal ? { signal } : {}),
+      body: JSON.stringify({ name }),
+    },
+  )
+  if (!response.ok) throw new ApiError(response.status)
+  return (await response.json()) as WorkspaceTargetResponse
+}
+
+/** Default Save As name: "{name} copy", truncated to 120 characters. */
+export function suggestCopyAnalysisName(name: string): string {
+  const trimmed = name.trim()
+  const suffix = ' copy'
+  if (trimmed.length + suffix.length <= 120) return `${trimmed}${suffix}`
+  return `${trimmed.slice(0, 120 - suffix.length)}${suffix}`
+}
+
+/** Notify the analysis sidebar that the saved-target list may have changed. */
+export function notifyTargetsChanged() {
+  window.dispatchEvent(new Event('reviewlens:targets-changed'))
+}
+
+/** Suggest a short analysis name from a Google Maps place URL path segment. */
+export function suggestAnalysisName(sourceUrl: string): string {
+  try {
+    const path = new URL(sourceUrl).pathname
+    const match = path.match(/\/place\/([^/]+)/)
+    if (!match) return ''
+    return decodeURIComponent(match[1].replace(/\+/g, ' ')).slice(0, 120)
+  } catch {
+    return ''
+  }
 }
 
 export class ApiError extends Error {

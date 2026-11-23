@@ -123,6 +123,35 @@ def test_openai_key_is_optional_and_redacted() -> None:
     assert "sk-test-key" not in repr(settings)
 
 
+def test_llm_provider_settings_are_parsed() -> None:
+    settings = settings_with(
+        llm_base_url="https://api.groq.com/openai/v1/",
+        llm_model="openai/gpt-oss-120b",
+    )
+
+    assert settings.llm_base_url == "https://api.groq.com/openai/v1"
+    assert settings.llm_model == "openai/gpt-oss-120b"
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "http://api.groq.com/openai/v1",
+        "https://user:password@api.groq.com/openai/v1",
+        "https://api.groq.com/openai/v1?key=value",
+        "",
+    ],
+)
+def test_invalid_llm_base_url_is_rejected(value: str) -> None:
+    with pytest.raises(ConfigurationError, match="LLM_BASE_URL"):
+        settings_with(llm_base_url=value)
+
+
+def test_empty_llm_model_is_rejected() -> None:
+    with pytest.raises(ConfigurationError, match="LLM_MODEL"):
+        settings_with(llm_model=" ")
+
+
 def test_empty_openai_key_is_rejected_without_echoing_value() -> None:
     with pytest.raises(ConfigurationError, match="OPENAI_API_KEY") as exc_info:
         settings_with(openai_api_key=" ")

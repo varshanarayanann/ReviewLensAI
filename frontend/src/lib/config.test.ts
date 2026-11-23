@@ -8,7 +8,7 @@ function fakeJwt(payload: Record<string, unknown>): string {
 }
 
 const base = {
-  VITE_API_BASE_URL: 'http://localhost:8000',
+  VITE_API_BASE_URL: 'http://localhost:8010',
   VITE_SUPABASE_URL: 'https://test-project.supabase.co',
   VITE_SUPABASE_ANON_KEY: 'sb_publishable_test_key',
 }
@@ -17,12 +17,12 @@ describe('loadConfig', () => {
   it('reads all values and strips trailing slashes from URLs', () => {
     const env = {
       ...base,
-      VITE_API_BASE_URL: 'http://localhost:8000/',
+      VITE_API_BASE_URL: 'http://localhost:8010/',
       VITE_SUPABASE_URL: 'https://test-project.supabase.co/',
     }
 
     expect(loadConfig(env)).toEqual({
-      apiBaseUrl: 'http://localhost:8000',
+      apiBaseUrl: 'http://localhost:8010',
       supabaseUrl: 'https://test-project.supabase.co',
       supabaseAnonKey: 'sb_publishable_test_key',
     })
@@ -39,7 +39,7 @@ describe('loadConfig', () => {
   it('accepts a Supabase anon key', () => {
     const env = { ...base, VITE_SUPABASE_ANON_KEY: fakeJwt({ role: 'anon' }) }
 
-    expect(loadConfig(env).apiBaseUrl).toBe('http://localhost:8000')
+    expect(loadConfig(env).apiBaseUrl).toBe('http://localhost:8010')
   })
 
   it('refuses to start with a service-role key in a VITE_ variable', () => {

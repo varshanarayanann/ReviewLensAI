@@ -1,5 +1,6 @@
 from functools import lru_cache
 from typing import Annotated, Literal
+from urllib.parse import urlsplit
 
 from pydantic import Field, SecretStr, ValidationError, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
@@ -52,6 +53,34 @@ class Settings(BaseSettings):
     @classmethod
     def reject_empty_openai_api_key(cls, value: SecretStr | None) -> SecretStr | None:
         if value is not None and not value.get_secret_value().strip():
+            raise ValueError("must not be empty")
+        return value
+
+    @field_validator("llm_base_url")
+    @classmethod
+    def validate_llm_base_url(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        value = value.strip()
+        parsed = urlsplit(value)
+        if (
+            parsed.scheme != "https"
+            or not parsed.hostname
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.query
+            or parsed.fragment
+        ):
+            raise ValueError("must be an HTTPS URL without credentials or query data")
+        return value.rstrip("/")
+
+    @field_validator("llm_model")
+    @classmethod
+    def reject_empty_llm_model(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        if not value:
             raise ValueError("must not be empty")
         return value
 

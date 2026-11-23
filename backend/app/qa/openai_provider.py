@@ -1,7 +1,7 @@
 """Stateless Responses API adapter for review-grounded Q&A.
 
 Defaults to OpenAI; ``LLM_BASE_URL`` and ``LLM_MODEL`` point it at another
-Responses-compatible provider such as xAI.
+Responses-compatible provider such as xAI or Groq.
 """
 
 import json
@@ -60,10 +60,10 @@ class OpenAIReviewLLM:
                 store=False,
             )
         except APIError:
-            raise LLMUnavailableError("OpenAI request failed.") from None
+            raise LLMUnavailableError("LLM provider request failed.") from None
 
         if not isinstance(response.output_text, str):
-            raise LLMUnavailableError("OpenAI returned no text.")
+            raise LLMUnavailableError("LLM provider returned no text.")
         return parse_model_reply(response.output_text)
 
 

@@ -362,7 +362,7 @@ source .venv/bin/activate
 python -m pip install -r requirements-dev.txt
 cp .env.example .env
 # Fill in local configuration, then:
-uvicorn app.main:create_app --factory --reload --port 8000
+uvicorn app.main:create_app --factory --reload --port 8010
 ```
 
 On Windows PowerShell, the README uses `py -3.13 -m venv .venv`, `.\.venv\Scripts\Activate.ps1`, and `Copy-Item .env.example .env`. Use Python 3.12+ from a supported installation; the README excludes MSYS2/MinGW Python for Ruff installation.
@@ -377,7 +377,7 @@ cp .env.example .env
 npm run dev
 ```
 
-Frontend normally serves at `http://localhost:5173`, backend at `http://localhost:8000`, local Swagger at `http://localhost:8000/docs`. If changing the backend port, update `VITE_API_BASE_URL`; if changing the frontend origin, update CORS and Supabase redirect configuration.
+Frontend normally serves at `http://localhost:5173`, backend at `http://localhost:8010`, local Swagger at `http://localhost:8010/docs`. If changing the backend port, update `VITE_API_BASE_URL`; if changing the frontend origin, update CORS and Supabase redirect configuration.
 
 Use `npm ci` for a reproducible existing checkout. `npm install` is the README's first-install command and is appropriate when intentionally changing dependencies; review and commit resulting lockfile changes.
 

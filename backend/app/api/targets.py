@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import get_current_user
 from app.auth.tokens import CurrentUser
 from app.db import get_db
-from app.models import AnalysisTarget, QuestionExchange
+from app.models import ActionItem, AnalysisTarget, QuestionExchange
 from app.models.ingestion import IngestionRun, Review
 from app.reviews.csv_source import ReviewSourceError, parse_csv_reviews
 from app.reviews.google_maps import ApifyReviewSource, ReviewCollectionError
@@ -81,7 +81,7 @@ def copy_target(
     user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Save As: new identity with copied reviews and Q&A; source stays untouched."""
+    """Save As: copy reviews and Q&A into a new identity; leave action items empty."""
     source = owned(target_id, user, db)
     try:
         copy = AnalysisTarget(
@@ -181,6 +181,7 @@ def delete_target(
         db.execute(
             delete(QuestionExchange).where(QuestionExchange.target_id == target_id)
         )
+        db.execute(delete(ActionItem).where(ActionItem.target_id == target_id))
         db.execute(delete(Review).where(Review.target_id == target_id))
         db.execute(delete(IngestionRun).where(IngestionRun.target_id == target_id))
         db.execute(delete(AnalysisTarget).where(AnalysisTarget.id == target_id))

@@ -3,7 +3,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import health, me, questions, targets
+from app.api import actions, health, me, questions, targets
 from app.auth.tokens import TokenVerifier
 from app.config import Settings, get_settings
 from app.qa.llm import LLMClient, UnconfiguredLLMClient
@@ -46,4 +46,5 @@ def create_app(
     app.include_router(me.router)
     app.include_router(targets.router)
     app.include_router(questions.router)
+    app.include_router(actions.router)
     return app

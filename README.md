@@ -496,3 +496,58 @@ Clearing removes exchanges visible to its database transaction. It does not canc
 model work in other tabs/clients: a later committed answer is a new history entry.
 The saved reviews remain available for subsequent questions. No additional
 migration or provider call is needed beyond the existing S3-006 schema.
+
+## Action Tracker APIs (S3-023 / S3-024)
+
+Varsha's backend portion of the Sprint 3 feature uses the existing `action_items`
+model and migration `0006_create_action_items.sql`. Install migrations through
+0006 before deployment; this API change adds no schema migration or dependency.
+The tracker UI and review-evidence management belong to separate team stories.
+
+| Method | Endpoint | Result |
+| --- | --- | --- |
+| POST | `/api/targets/{target_id}/actions` | 201 with the saved action item |
+| GET | `/api/targets/{target_id}/actions` | 200 array, all items, oldest `created_at` then UUID |
+| PATCH | `/api/targets/{target_id}/actions/{action_id}` | 200 with the updated saved item |
+| DELETE | `/api/targets/{target_id}/actions/{action_id}` | Empty 204 after deletion commits |
+
+Creation accepts `title` (trimmed, 1–200 characters), optional `description`
+(trimmed, nullable, at most 10,000 characters), and `priority` (`low`, `medium`,
+`high`, default `medium`). A newly created item always starts `open`. Request
+bodies reject extra fields, including owner/target IDs and creation status.
+
+PATCH accepts any nonempty subset of `title`, `description`, `priority`, and
+`status`. Omitted fields remain unchanged. Explicit `null` is allowed only for
+`description`, to remove it. Statuses are `open`, `in_progress`, and `done`:
+display these as Open, In Progress, and Resolved in the UI. The outline proposed
+`resolved`; PATCH also accepts that spelling and normalizes it to `done`, which
+the existing model/migration already use. Responses always return canonical
+`done`. Reopening a resolved item means PATCH `{"status":"open"}`. GET optionally
+filters with `?status=open`, `in_progress`, `done`, or the `resolved` alias.
+
+Responses contain `id`, `target_id`, `title`, `description`, `priority`, `status`,
+`created_at`, and `updated_at` (UTC timestamps). Accepted patches update
+`updated_at` while preserving creation time. An empty owned tracker returns `[]`.
+These response objects can be used directly by the S3-029 interface; action
+generation is manual, with no AI/provider call or review ingestion required.
+
+Every operation verifies parent ownership from authenticated identity. Mutations
+also match the action ID to the path's target; another owned target cannot be
+used to update an unrelated action. Missing/inaccessible parents and missing or
+wrong-target items return the same safe 404. Invalid input returns 422; absent
+authentication returns 401. Writes use explicit commit/rollback and safe 503 on
+database failure, without logging task contents or database diagnostics. Mutations
+lock the parent to coordinate with analysis deletion and concurrent task writes.
+Successful POST/PATCH responses are serialized after flush and returned only after
+commit; retrying POST can create a second task (no idempotency key is implemented).
+
+**S3-025 integration contract:** The review-link model is not on the inspected
+main baseline (`1cd8bf9`). Its `action_item_id` foreign key must reference
+`action_items.id ON DELETE CASCADE`. Deleting an action then removes only its
+evidence relationships, never the underlying reviews. The action API uses a
+target-scoped SQL DELETE, so it does not depend on ORM relationship cascade
+settings. Tests exercise this FK contract using a temporary relationship table
+in SQLite/PostgreSQL; that fixture is not a production model or migration.
+Do not introduce a competing evidence table from this story. Once S3-025 lands,
+run the same deletion workflow against its real model/migration before claiming
+the complete supporting-evidence feature is integrated.

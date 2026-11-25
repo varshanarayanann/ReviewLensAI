@@ -21,3 +21,8 @@ their stable history-order index, and RLS without public policies. Apply it befo
 deploying S3-006 backend changes: Q&A now commits history before returning success,
 and target deletion explicitly removes history in its transaction. The migration
 does not backfill exchanges from before persistence existed or change review data.
+
+Migration `0006_create_action_items.sql` adds analysis-owned action items with
+title, optional description, priority, status, timestamps, cascade delete with
+the parent AnalysisTarget, and RLS without public policies. New rows default to
+`open` status and `medium` priority. Apply it before deploying action-item APIs.

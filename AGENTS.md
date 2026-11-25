@@ -2,6 +2,14 @@
 
 ## Google Maps ingestion update
 
+S3-023/024 add protected `/api/targets/{target_id}/actions` POST/GET and
+`/{action_id}` PATCH/DELETE, using migration 0006's existing ActionItem model.
+Canonical API statuses are open/in_progress/done (UI label Resolved for done);
+PATCH/filter also accept resolved as an alias. Parent ownership and item/target
+association are verified server-side; writes commit/rollback and log safely.
+S3-025 must FK-cascade evidence links from action_items without deleting reviews.
+The absent production evidence model is not invented here; see README contract.
+
 S3-008 adds confirmed **Clear Q&A history** and protected
 `DELETE /api/targets/{target_id}/questions`. Only target-owned exchanges are deleted
 transactionally; target/source/reviews/ingestion records and summaries remain.
